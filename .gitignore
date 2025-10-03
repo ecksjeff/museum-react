@@ -1,0 +1,46 @@
+# Large media files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.mp3
+*.wav
+*.flac
+*.psd
+*.ai
+*.eps
+
+# Large 3D model files (since you mentioned .glb files)
+*.fbx
+*.obj
+*.blend
+*.max
+*.ma
+*.mb
+*.blend
+
+# Keep .glb files if they're essential and not too large
+# *.glb
+
+# Build files and dependencies
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
+*.log
