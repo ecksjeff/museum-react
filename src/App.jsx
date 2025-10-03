@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Splat, useGLTF, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
+import splatUrl from '/living-room.splat?url'
 
 // Error boundary component
 class ErrorBoundary extends React.Component {
@@ -29,17 +30,43 @@ class ErrorBoundary extends React.Component {
 
 // Splat room component
 function SplatRoom() {
+  console.log('Splat URL', splatUrl);
+
   return (
     <Suspense fallback={<FallbackRoom />}>
       <ErrorBoundary fallback={<FallbackRoom />}>
         <Splat 
-          src="/living-room.splat" 
+          src={splatUrl}
           scale={3.5}
           position={[4, 0, 0]}
           rotation={[0, .3, 0]}
         />
       </ErrorBoundary>
     </Suspense>
+  );
+}
+
+function ManualSplatLoader() {
+  const [loaded, setLoaded] = useState(false);
+  const meshRef = useRef();
+
+  useEffect(() => {
+    fetch('/living-room.splat')
+      .then(r => r.arrayBuffer())
+      .then(buffer => {
+        console.log('Manual load successful, buffer size:', buffer.byteLength);
+        setLoaded(true);
+      })
+      .catch(e => console.error('Manual load failed:', e));
+  }, []);
+
+  if (!loaded) return <FallbackRoom />;
+
+  return (
+    <mesh ref={meshRef} position={[4, 0, 0]}>
+      <boxGeometry args={[2, 2, 2]} />
+      <meshBasicMaterial color="green" />
+    </mesh>
   );
 }
 
