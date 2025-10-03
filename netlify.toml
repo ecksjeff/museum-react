@@ -1,0 +1,5 @@
+[[headers]]
+  for = "/*.splat"
+  [headers.values]
+    Content-Type = "application/octet-stream"
+    Access-Control-Allow-Origin = "*"
