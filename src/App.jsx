@@ -3,7 +3,6 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Splat, useGLTF, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
-import splatUrl from '/living-room.splat?url'
 
 // Error boundary component
 class ErrorBoundary extends React.Component {
@@ -30,6 +29,7 @@ class ErrorBoundary extends React.Component {
 
 // Splat room component
 function SplatRoom() {
+  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
   console.log('Splat URL', splatUrl);
 
   return (
