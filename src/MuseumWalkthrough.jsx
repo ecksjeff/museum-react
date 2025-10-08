@@ -750,7 +750,7 @@ function CameraController({
   useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn);
 
   useEffect(() => {
-    camera.position.set(0, 1.75, 0);
+    camera.position.set(0, 1.5, 0);
   }, [camera]);
 
   useFrame((state) => {
