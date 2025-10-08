@@ -26,7 +26,8 @@ class ErrorBoundary extends React.Component {
 }
 
 function SplatRoom() {
-  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
+  // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
+  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/House-Museum.splat"
   
   return (
     <Suspense fallback={<FallbackRoom />}>

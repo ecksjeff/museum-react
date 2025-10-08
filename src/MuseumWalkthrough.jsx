@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo, Suspense } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Splat, useGLTF, PerspectiveCamera } from '@react-three/drei';
+import { Splat, useGLTF, PerspectiveCamera, useProgress } from '@react-three/drei';
 import * as THREE from 'three';
 import { PLYLoader } from 'three/examples/jsm/loaders/PLYLoader.js';
 
@@ -27,9 +27,56 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+function LoadingScreen({ progress }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: '#ffffffff',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 9999,
+      color: 'grey'
+    }}>
+      <h2 style={{ marginBottom: '20px' }}>Loading Museum...</h2>
+      <div style={{
+        width: '300px',
+        height: '20px',
+        background: 'rgba(255,255,255,0.2)',
+        borderRadius: '10px',
+        overflow: 'hidden'
+      }}>
+        <div style={{
+          width: `${progress}%`,
+          height: '100%',
+          background: 'linear-gradient(90deg, #b9b9b9ff, #a7a7a7ff)',
+          transition: 'width 0.3s ease'
+        }}/>
+      </div>
+      <p style={{ marginTop: '10px', fontSize: '14px' }}>{Math.round(progress)}%</p>
+    </div>
+  );
+}
+
+function Loader() {
+  const { progress, active } = useProgress();
+
+  if (!active && progress === 100) {
+    return null;
+  } 
+
+  return <LoadingScreen progress={progress} />;
+}
+
 // Splat room component
 function SplatRoom() {
-  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
+  // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
+  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/House-Museum.splat"
   console.log('Splat URL', splatUrl);
 
   return (
@@ -37,9 +84,9 @@ function SplatRoom() {
       <ErrorBoundary fallback={<FallbackRoom />}>
         <Splat 
           src={splatUrl}
-          scale={3.5}
-          position={[4, 0, 0]}
-          rotation={[0, .3, 0]}
+          scale={1}
+          position={[1.5, 0, 3]}
+          rotation={[0, 0, 0]}
         />
       </ErrorBoundary>
     </Suspense>
@@ -113,40 +160,51 @@ function ManualSplatLoader() {
 //   );
 // }
 
-// Fallback room component (simple geometry as backup)
 function FallbackRoom() {
   return (
     <group>
-      {/* Simple room geometry as fallback */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[14, 13]} />
-        <meshLambertMaterial color="#8B4513" />
-      </mesh>
-      {/* Walls */}
-      <mesh position={[0, 3.5, -6.5]} receiveShadow>
-        <planeGeometry args={[14, 7]} />
-        <meshLambertMaterial color="#f5f5f5" />
-      </mesh>
-      <mesh position={[0, 3.5, 6.5]} rotation={[0, Math.PI, 0]} receiveShadow>
-        <planeGeometry args={[14, 7]} />
-        <meshLambertMaterial color="#e0e0e0" />
-      </mesh>
-      <mesh position={[-7, 3.5, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[13, 7]} />
-        <meshLambertMaterial color="#f0f0f0" />
-      </mesh>
-      <mesh position={[7, 3.5, 0]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
-        <planeGeometry args={[13, 7]} />
-        <meshLambertMaterial color="#e8e8e8" />
-      </mesh>
-      {/* Ceiling */}
-      <mesh position={[0, 7, 0]} rotation={[Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[14, 13]} />
-        <meshLambertMaterial color="#ffffff" />
+        <meshBasicMaterial color="#000000" opacity={0.1} transparent />
       </mesh>
     </group>
   );
 }
+
+// Fallback room component (simple geometry as backup)
+// function FallbackRoom() {
+//   return (
+//     <group>
+//       {/* Simple room geometry as fallback */}
+//       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+//         <planeGeometry args={[14, 13]} />
+//         <meshLambertMaterial color="#8B4513" />
+//       </mesh>
+//       {/* Walls */}
+//       <mesh position={[0, 3.5, -6.5]} receiveShadow>
+//         <planeGeometry args={[14, 7]} />
+//         <meshLambertMaterial color="#f5f5f5" />
+//       </mesh>
+//       <mesh position={[0, 3.5, 6.5]} rotation={[0, Math.PI, 0]} receiveShadow>
+//         <planeGeometry args={[14, 7]} />
+//         <meshLambertMaterial color="#e0e0e0" />
+//       </mesh>
+//       <mesh position={[-7, 3.5, 0]} rotation={[0, Math.PI / 2, 0]} receiveShadow>
+//         <planeGeometry args={[13, 7]} />
+//         <meshLambertMaterial color="#f0f0f0" />
+//       </mesh>
+//       <mesh position={[7, 3.5, 0]} rotation={[0, -Math.PI / 2, 0]} receiveShadow>
+//         <planeGeometry args={[13, 7]} />
+//         <meshLambertMaterial color="#e8e8e8" />
+//       </mesh>
+//       {/* Ceiling */}
+//       <mesh position={[0, 7, 0]} rotation={[Math.PI / 2, 0, 0]}>
+//         <planeGeometry args={[14, 13]} />
+//         <meshLambertMaterial color="#ffffff" />
+//       </mesh>
+//     </group>
+//   );
+// }
 
 // Family photo data
 const familyPhotos = [
@@ -311,89 +369,137 @@ function DestinationMarker({ position, visible, color = 0x00ff00 }) {
 }
 
 // Interactive table component
-function InteractiveTable({ onInteract }) {
-  const { scene, error } = useGLTF('photo-table.glb');
-  const tableRef = useRef();
+function InteractiveTable({ onInteract, setHoverVisible }) {
   const dragStartRef = useRef({ x: 0, y: 0 });
   const isDraggingRef = useRef(false);
 
-  useEffect(() => {
-    if (scene) {
-      scene.scale.setScalar(0.6);
-      scene.traverse((child) => {
-        if (child.isMesh) {
-          child.castShadow = true;
-          child.receiveShadow = true;
-          child.userData = {
-            isExhibit: true,
-            isInteractiveTable: true,
-            name: 'Roz Wyman Family Collection',
-            audioText: 'Click to explore the Roz Wyman family collection.'
-          };
+  return (
+    <mesh 
+      position={[1.65, .5, 4]} 
+      onPointerEnter={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'pointer';
+        setHoverVisible(false);
+      }}
+      onPointerLeave={(e) => {
+        e.stopPropagation();
+        document.body.style.cursor = 'default';
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+        isDraggingRef.current = false;
+      }}
+      onPointerMove={(e) => {
+        e.stopPropagation();
+        if (dragStartRef.current.x !== undefined) {
+          const dragDistance = Math.sqrt(
+            Math.pow(e.nativeEvent.clientX - dragStartRef.current.x, 2) + 
+            Math.pow(e.nativeEvent.clientY - dragStartRef.current.y, 2)
+          );
+          if (dragDistance > 5) {
+            isDraggingRef.current = true;
+          }
         }
-      });
-    }
-  }, [scene]);
-
-  // If GLB fails to load, create simple placeholder
-  if (error || !scene) {
-    return (
-      <mesh 
-        position={[0.25, 1, 7]} 
-        onClick={(e) => {
+      }}
+      onClick={(e) => {
+        if (!isDraggingRef.current) {
           e.stopPropagation();
           onInteract();
-        }}
-      >
-        <boxGeometry args={[2, 0.8, 1]} />
-        <meshLambertMaterial color="#8B4513" />
-      </mesh>
-    );
-  }
-
-  return (
-    <group>
-      <primitive 
-        ref={tableRef}
-        object={scene} 
-        position={[2, 0, 5]} 
-        rotation={[0, Math.PI, 0]}
-      />
-      {/* Invisible clickable box over the table */}
-      <mesh 
-        position={[2, 1, 5]} 
-        onPointerEnter={() => document.body.style.cursor = 'pointer'}
-        onPointerLeave={() => document.body.style.cursor = 'default'}
-        onPointerDown={(e) => {
-          dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
-          isDraggingRef.current = false;
-        }}
-        onPointerMove={(e) => {
-          if (dragStartRef.current.x !== undefined) {
-            const dragDistance = Math.sqrt(
-              Math.pow(e.nativeEvent.clientX - dragStartRef.current.x, 2) + 
-              Math.pow(e.nativeEvent.clientY - dragStartRef.current.y, 2)
-            );
-            if (dragDistance > 5) {
-              isDraggingRef.current = true;
-            }
-          }
-        }}
-        onClick={(e) => {
-          if (!isDraggingRef.current) {
-            e.stopPropagation();
-            onInteract();
-          }
-          isDraggingRef.current = false;
-          dragStartRef.current = { x: undefined, y: undefined };
-        }}
-      >
-        <boxGeometry args={[2, 1, 1]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
-    </group>
+        }
+        isDraggingRef.current = false;
+        dragStartRef.current = { x: undefined, y: undefined };
+      }}
+    >
+      <boxGeometry args={[2, 1, 1]} />
+      <meshBasicMaterial visible={false} />
+    </mesh>
   );
 }
+
+// commented out to hide glb of table and use splat table
+// function InteractiveTable({ onInteract }) {
+//   const { scene, error } = useGLTF('photo-table.glb');
+//   const tableRef = useRef();
+//   const dragStartRef = useRef({ x: 0, y: 0 });
+//   const isDraggingRef = useRef(false);
+
+//   useEffect(() => {
+//     if (scene) {
+//       scene.scale.setScalar(0.6);
+//       scene.traverse((child) => {
+//         if (child.isMesh) {
+//           child.castShadow = true;
+//           child.receiveShadow = true;
+//           child.userData = {
+//             isExhibit: true,
+//             isInteractiveTable: true,
+//             name: 'Roz Wyman Family Collection',
+//             audioText: 'Click to explore the Roz Wyman family collection.'
+//           };
+//         }
+//       });
+//     }
+//   }, [scene]);
+//   // If GLB fails to load, create simple placeholder
+//   if (error || !scene) {
+//     return (
+//       <mesh 
+//         position={[0.25, 1, 7]} 
+//         onClick={(e) => {
+//           e.stopPropagation();
+//           onInteract();
+//         }}
+//       >
+//         <boxGeometry args={[2, 0.8, 1]} />
+//         <meshLambertMaterial color="#8B4513" />
+//       </mesh>
+//     );
+//   }
+
+//   return (
+//     <group>
+//       <primitive 
+//         ref={tableRef}
+//         object={scene} 
+//         position={[2, 0, 5]} 
+//         rotation={[0, Math.PI, 0]}
+//       />
+//       {/* Invisible clickable box over the table */}
+//       <mesh 
+//         position={[2, 1, 5]} 
+//         onPointerEnter={() => document.body.style.cursor = 'pointer'}
+//         onPointerLeave={() => document.body.style.cursor = 'default'}
+//         onPointerDown={(e) => {
+//           dragStartRef.current = { x: e.nativeEvent.clientX, y: e.nativeEvent.clientY };
+//           isDraggingRef.current = false;
+//         }}
+//         onPointerMove={(e) => {
+//           if (dragStartRef.current.x !== undefined) {
+//             const dragDistance = Math.sqrt(
+//               Math.pow(e.nativeEvent.clientX - dragStartRef.current.x, 2) + 
+//               Math.pow(e.nativeEvent.clientY - dragStartRef.current.y, 2)
+//             );
+//             if (dragDistance > 5) {
+//               isDraggingRef.current = true;
+//             }
+//           }
+//         }}
+//         onClick={(e) => {
+//           if (!isDraggingRef.current) {
+//             e.stopPropagation();
+//             onInteract();
+//           }
+//           isDraggingRef.current = false;
+//           dragStartRef.current = { x: undefined, y: undefined };
+//         }}
+//       >
+//         <boxGeometry args={[2, 1, 1]} />
+//         <meshBasicMaterial transparent opacity={0} />
+//       </mesh>
+//     </group>
+//   );
+// }
 
 // Wall painting component
 function WallPainting({ position, rotation, color, name, description, onExhibitClick }) {
@@ -451,6 +557,7 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
   useEffect(() => {
     if (scene) {
       scene.scale.setScalar(2);
+      scene.visible = false;
       scene.traverse((child) => {
         if (child.isMesh) {
           child.visible = false;
@@ -510,8 +617,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -7 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 7) {
+              point.x >= -4.5 && point.x <= 7 &&
+              point.z >= -6.5 && point.z <= 4.5) {
             setHoverPosition([point.x, 0.06, point.z]);
             setHoverVisible(true);
           }
@@ -524,8 +631,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -7 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 7) {
+              point.x >= -4.5 && point.x <= 7 &&
+              point.z >= -6.5 && point.z <= 4.5) {
             setHoverPosition([point.x, 0.06, point.z]);
             setHoverVisible(true);
           } else {
@@ -541,8 +648,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
           
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -7 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 7) {
+              point.x >= -4.5 && point.x <= 7 &&
+              point.z >= -6.5 && point.z <= 4.5) {
             onFloorClick(point);
           }
         }}
@@ -562,8 +669,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -7 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 7) {
+            point.x >= -4.5 && point.x <= 7 &&
+            point.z >= -6.5 && point.z <= 4.5) {
           setHoverPosition([point.x, 0.06, point.z]);
           setHoverVisible(true);
         }
@@ -576,8 +683,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -7 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 7) {
+            point.x >= -4.5 && point.x <= 7 &&
+            point.z >= -6.5 && point.z <= 4.5) {
           setHoverPosition([point.x, 0.06, point.z]);
           setHoverVisible(true);
         } else {
@@ -593,8 +700,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
         
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -7 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 7) {
+            point.x >= -4.5 && point.x <= 7 &&
+            point.z >= -6.5 && point.z <= 4.5) {
           onFloorClick(point);
         }
       }}
@@ -640,10 +747,10 @@ function CameraController({
   const zoomTargetQuaternion = useRef(new THREE.Quaternion());
 
   useMouseControls(camera, isInteractiveMode, isAnimating, setCursorState);
-  useKeyboardMovement(camera, isMoving, isInteractiveMode);
+  useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn);
 
   useEffect(() => {
-    camera.position.set(0, 2, 0);
+    camera.position.set(0, 1.75, 0);
   }, [camera]);
 
   useFrame((state) => {
@@ -1123,7 +1230,7 @@ function useMouseControls(camera, isInteractiveMode, isAnimating, setCursorState
 }
 
 // WASD movement hook
-function useKeyboardMovement(camera, isMoving, isInteractiveMode) {
+function useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn) {
   const keys = useRef({
     forward: false,
     backward: false,
@@ -1203,9 +1310,12 @@ function useKeyboardMovement(camera, isMoving, isInteractiveMode) {
     }
 
     // Keep camera within bounds and at proper height
-    camera.position.x = Math.max(-7, Math.min(7, camera.position.x));
-    camera.position.z = Math.max(-6.5, Math.min(7, camera.position.z));
-    camera.position.y = 2.5;
+    camera.position.x = Math.max(-4.5, Math.min(7, camera.position.x));
+    camera.position.z = Math.max(-6.5, Math.min(4.5, camera.position.z));
+    // camera.position.y = 1.75;
+    if (!isZoomedIn) {
+      camera.position.y = 1.75;
+    }
   });
 }
 
@@ -1261,12 +1371,12 @@ function MuseumWalkthrough() {
   const cameraRef = useRef();
 
   const paintings = useMemo(() => [
-    { position: [-2, 2.5, -6.9], rotation: [0, 0, 0], color: 0x4ecdc4, name: 'Teal Serenity', description: 'This serene teal painting evokes feelings of calm and tranquility, reminiscent of ocean depths.' },
-    { position: [0, 2.5, -6.9], rotation: [0, 0, 0], color: 0xff6b6b, name: 'Coral Passion', description: 'This vibrant coral painting radiates warmth and energy, capturing the essence of a sunset.' },
-    { position: [2, 2.5, -6.9], rotation: [0, 0, 0], color: 0xffe66d, name: 'Golden Dreams', description: 'This bright golden painting brings light and optimism, like captured sunshine.' },
-    { position: [-7.4, 2.5, -3], rotation: [0, Math.PI / 2, 0], color: 0xa8e6cf, name: 'Mint Harmony', description: 'This soft mint painting brings balance and peace, like a gentle spring breeze.' },
-    { position: [-7.4, 2.5, 0], rotation: [0, Math.PI / 2, 0], color: 0x88d8c0, name: 'Sage Wisdom', description: 'This wise sage painting represents growth and natural beauty.' },
-    { position: [-7.4, 2.5, 3], rotation: [0, Math.PI / 2, 0], color: 0xffd93d, name: 'Sunny Disposition', description: 'This cheerful yellow painting lifts spirits and brightens any space.' },
+    { position: [-0.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0x4ecdc4, name: 'Teal Serenity', description: 'This serene teal painting evokes feelings of calm and tranquility, reminiscent of ocean depths.' },
+    { position: [1.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xff6b6b, name: 'Coral Passion', description: 'This vibrant coral painting radiates warmth and energy, capturing the essence of a sunset.' },
+    { position: [3.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xffe66d, name: 'Golden Dreams', description: 'This bright golden painting brings light and optimism, like captured sunshine.' },
+    { position: [-4.5, 2.5, -3], rotation: [0, Math.PI / 2, 0], color: 0xa8e6cf, name: 'Mint Harmony', description: 'This soft mint painting brings balance and peace, like a gentle spring breeze.' },
+    { position: [-4.5, 2.5, 0], rotation: [0, Math.PI / 2, 0], color: 0x88d8c0, name: 'Sage Wisdom', description: 'This wise sage painting represents growth and natural beauty.' },
+    { position: [-4.5, 2.5, 3], rotation: [0, Math.PI / 2, 0], color: 0xffd93d, name: 'Sunny Disposition', description: 'This cheerful yellow painting lifts spirits and brightens any space.' },
     { position: [8, 2.5, -3], rotation: [0, -Math.PI / 2, 0], color: 0x6c5ce7, name: 'Purple Majesty', description: 'This regal purple painting commands attention with its deep, rich tones.' },
     { position: [8, 2.5, 0], rotation: [0, -Math.PI / 2, 0], color: 0xfd79a8, name: 'Rose Blush', description: 'This delicate rose painting captures the softness of dawn light.' },
     { position: [8, 2.5, 3], rotation: [0, -Math.PI / 2, 0], color: 0x00b894, name: 'Emerald Forest', description: 'This rich emerald painting brings the vitality of nature indoors.' }
@@ -1276,27 +1386,27 @@ function MuseumWalkthrough() {
   const presetLocations = useMemo(() => [
     {
       name: "Center",
-      position: [0, 2.5, 0]
+      position: [1, 2.5, 0]
     },
     {
       name: "North Wall",
-      position: [0, 2.5, -4]
+      position: [1.5, 2.5, -2]
     },
     {
       name: "South Wall", 
-      position: [0, 2.5, 4]
+      position: [1.75, 2.5, 2]
     },
     {
       name: "West Wall",
-      position: [-4, 2.5, 0]
+      position: [2, 2.5, 0]
     },
     {
       name: "East Wall",
-      position: [4, 2.5, 0]
+      position: [2, 2.5, -1]
     },
     {
       name: "Table View",
-      position: [2, 2.5, 2]
+      position: [1.75, 2.5, 1.5]
     }
   ], []);
 
@@ -1335,7 +1445,7 @@ function MuseumWalkthrough() {
           cameraRef.current.rotation.set(0, -Math.PI / 2, 0);
           break;
         case "Table View":
-          cameraRef.current.rotation.set(0, Math.PI, 0);
+          cameraRef.current.rotation.set(.5, Math.PI, 0);
           break;
         case "Center":
         default:
@@ -1359,7 +1469,7 @@ function MuseumWalkthrough() {
       return;
     }
     
-    const newTarget = new THREE.Vector3(point.x, 2.5, point.z);
+    const newTarget = new THREE.Vector3(point.x, 1.75, point.z);
     
     // Check if target is too close to current position
     if (cameraRef.current) {
@@ -1483,6 +1593,8 @@ function MuseumWalkthrough() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000' }}>
+      <Loader />
+
       <Canvas shadows style={{ background: '#f0f0f0' }}>
         <PerspectiveCamera makeDefault position={[0, 2, 0]} fov={70} />
         
@@ -1532,7 +1644,10 @@ function MuseumWalkthrough() {
 
         {/* Interactive table */}
         <Suspense fallback={null}>
-          <InteractiveTable onInteract={handleInteractiveMode} />
+          <InteractiveTable 
+            onInteract={handleInteractiveMode} 
+            setHoverVisible={setHoverVisible}
+          />
         </Suspense>
 
         {/* Wall paintings */}
