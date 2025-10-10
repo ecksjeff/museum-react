@@ -77,7 +77,7 @@ function Loader() {
 function SplatRoom() {
   // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
   // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/House-Museum.splat"
-  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/House-Museum_Splat3.splat"
+  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/Splat5.splat"
   console.log('Splat URL', splatUrl);
 
   return (
