@@ -85,9 +85,9 @@ function SplatRoom() {
       <ErrorBoundary fallback={<FallbackRoom />}>
         <Splat 
           src={splatUrl}
-          scale={1}
-          position={[1.5, 0, 3]}
-          rotation={[0, 0, 0]}
+          scale={1.2}
+          position={[1.65, 0, 3.45]}
+          rotation={[0, -Math.PI / 2, 0]}
         />
       </ErrorBoundary>
     </Suspense>
@@ -1315,7 +1315,7 @@ function useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn) {
     camera.position.z = Math.max(-6.5, Math.min(4.5, camera.position.z));
     // camera.position.y = 1.75;
     if (!isZoomedIn) {
-      camera.position.y = 1.75;
+      camera.position.y = 1.5;
     }
   });
 }
@@ -1371,17 +1371,17 @@ function MuseumWalkthrough() {
   const { setCursorState } = useCursorStates(isInteractiveMode);
   const cameraRef = useRef();
 
-  const paintings = useMemo(() => [
-    { position: [-0.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0x4ecdc4, name: 'Teal Serenity', description: 'This serene teal painting evokes feelings of calm and tranquility, reminiscent of ocean depths.' },
-    { position: [1.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xff6b6b, name: 'Coral Passion', description: 'This vibrant coral painting radiates warmth and energy, capturing the essence of a sunset.' },
-    { position: [3.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xffe66d, name: 'Golden Dreams', description: 'This bright golden painting brings light and optimism, like captured sunshine.' },
-    { position: [-4.5, 2.5, -3], rotation: [0, Math.PI / 2, 0], color: 0xa8e6cf, name: 'Mint Harmony', description: 'This soft mint painting brings balance and peace, like a gentle spring breeze.' },
-    { position: [-4.5, 2.5, 0], rotation: [0, Math.PI / 2, 0], color: 0x88d8c0, name: 'Sage Wisdom', description: 'This wise sage painting represents growth and natural beauty.' },
-    { position: [-4.5, 2.5, 3], rotation: [0, Math.PI / 2, 0], color: 0xffd93d, name: 'Sunny Disposition', description: 'This cheerful yellow painting lifts spirits and brightens any space.' },
-    { position: [8, 2.5, -3], rotation: [0, -Math.PI / 2, 0], color: 0x6c5ce7, name: 'Purple Majesty', description: 'This regal purple painting commands attention with its deep, rich tones.' },
-    { position: [8, 2.5, 0], rotation: [0, -Math.PI / 2, 0], color: 0xfd79a8, name: 'Rose Blush', description: 'This delicate rose painting captures the softness of dawn light.' },
-    { position: [8, 2.5, 3], rotation: [0, -Math.PI / 2, 0], color: 0x00b894, name: 'Emerald Forest', description: 'This rich emerald painting brings the vitality of nature indoors.' }
-  ], []);
+  // const paintings = useMemo(() => [
+  //   { position: [-0.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0x4ecdc4, name: 'Teal Serenity', description: 'This serene teal painting evokes feelings of calm and tranquility, reminiscent of ocean depths.' },
+  //   { position: [1.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xff6b6b, name: 'Coral Passion', description: 'This vibrant coral painting radiates warmth and energy, capturing the essence of a sunset.' },
+  //   { position: [3.5, 2.5, -6.75], rotation: [0, 0, 0], color: 0xffe66d, name: 'Golden Dreams', description: 'This bright golden painting brings light and optimism, like captured sunshine.' },
+  //   { position: [-4.5, 2.5, -3], rotation: [0, Math.PI / 2, 0], color: 0xa8e6cf, name: 'Mint Harmony', description: 'This soft mint painting brings balance and peace, like a gentle spring breeze.' },
+  //   { position: [-4.5, 2.5, 0], rotation: [0, Math.PI / 2, 0], color: 0x88d8c0, name: 'Sage Wisdom', description: 'This wise sage painting represents growth and natural beauty.' },
+  //   { position: [-4.5, 2.5, 3], rotation: [0, Math.PI / 2, 0], color: 0xffd93d, name: 'Sunny Disposition', description: 'This cheerful yellow painting lifts spirits and brightens any space.' },
+  //   { position: [8, 2.5, -3], rotation: [0, -Math.PI / 2, 0], color: 0x6c5ce7, name: 'Purple Majesty', description: 'This regal purple painting commands attention with its deep, rich tones.' },
+  //   { position: [8, 2.5, 0], rotation: [0, -Math.PI / 2, 0], color: 0xfd79a8, name: 'Rose Blush', description: 'This delicate rose painting captures the softness of dawn light.' },
+  //   { position: [8, 2.5, 3], rotation: [0, -Math.PI / 2, 0], color: 0x00b894, name: 'Emerald Forest', description: 'This rich emerald painting brings the vitality of nature indoors.' }
+  // ], []);
 
   // Preset camera view locations
   const presetLocations = useMemo(() => [
@@ -1470,7 +1470,7 @@ function MuseumWalkthrough() {
       return;
     }
     
-    const newTarget = new THREE.Vector3(point.x, 1.75, point.z);
+    const newTarget = new THREE.Vector3(point.x, 1.5, point.z);
     
     // Check if target is too close to current position
     if (cameraRef.current) {
@@ -1651,8 +1651,8 @@ function MuseumWalkthrough() {
           />
         </Suspense>
 
-        {/* Wall paintings */}
-        {paintings.map((painting, index) => (
+        {/* Wall paintings - commented out for now*/}
+        {/* {paintings.map((painting, index) => (
           <WallPainting
             key={index}
             position={painting.position}
@@ -1662,7 +1662,7 @@ function MuseumWalkthrough() {
             description={painting.description}
             onExhibitClick={handleExhibitClick}
           />
-        ))}
+        ))} */}
 
         {/* Floor markers */}
         <DestinationMarker 
