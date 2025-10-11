@@ -27,7 +27,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function LoadingScreen({ progress }) {
+function LoadingScreen({ progress, isProcessing }) {
   return (
     <div style={{
       position: 'fixed',
@@ -43,7 +43,9 @@ function LoadingScreen({ progress }) {
       zIndex: 9999,
       color: 'grey'
     }}>
-      <h2 style={{ marginBottom: '20px' }}>Loading Museum...</h2>
+      <h2 style={{ marginBottom: '20px' }}>
+        {isProcessing ? 'Processing scene...' : 'Loading Museum...'}
+      </h2>
       <div style={{
         width: '300px',
         height: '20px',
@@ -58,19 +60,56 @@ function LoadingScreen({ progress }) {
           transition: 'width 0.3s ease'
         }}/>
       </div>
-      <p style={{ marginTop: '10px', fontSize: '14px' }}>{Math.round(progress)}%</p>
+      <p style={{ marginTop: '10px', fontSize: '14px' }}>
+        {isProcessing ? 'Almost ready...' : `${Math.round(progress)}%`}
+      </p>
     </div>
   );
 }
 
 function Loader() {
   const { progress, active } = useProgress();
+  const [shouldHide, setShouldHide] = useState(false);
+  const timeoutRef = useRef(null);
 
-  if (!active && progress === 100) {
+  useEffect(() => {
+    // When we hit 100%, start a timeout
+    if (progress >= 100) {
+      // Clear any existing timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
+      // Set a 3-second timeout for processing
+      timeoutRef.current = setTimeout(() => {
+        setShouldHide(true);
+      }, 3000); // Wait 3 seconds after 100% before hiding
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [progress]);
+
+  // Also hide if active becomes false
+  useEffect(() => {
+    if (!active && progress >= 100) {
+      setShouldHide(true);
+    }
+  }, [active, progress]);
+
+  if (shouldHide) {
     return null;
-  } 
+  }
 
-  return <LoadingScreen progress={progress} />;
+  return (
+    <LoadingScreen 
+      progress={progress} 
+      isProcessing={progress >= 100} 
+    />
+  );
 }
 
 // Splat room component
@@ -618,8 +657,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -4.5 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 4.5) {
+              point.x >= -3.35 && point.x <= 6.5 &&
+              point.z >= -5 && point.z <= 4) {
             setHoverPosition([point.x, 0.06, point.z]);
             setHoverVisible(true);
           }
@@ -632,8 +671,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -4.5 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 4.5) {
+              point.x >= -3.35 && point.x <= 6.5 &&
+              point.z >= -5 && point.z <= 4) {
             setHoverPosition([point.x, 0.06, point.z]);
             setHoverVisible(true);
           } else {
@@ -649,8 +688,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
           
           const point = e.point;
           if (point.y < 0.5 && 
-              point.x >= -4.5 && point.x <= 7 &&
-              point.z >= -6.5 && point.z <= 4.5) {
+              point.x >= -3.35 && point.x <= 6.5 &&
+              point.z >= -5 && point.z <= 4) {
             onFloorClick(point);
           }
         }}
@@ -670,8 +709,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -4.5 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 4.5) {
+            point.x >= -3.35 && point.x <= 6.5 &&
+            point.z >= -5 && point.z <= 4) {
           setHoverPosition([point.x, 0.06, point.z]);
           setHoverVisible(true);
         }
@@ -684,8 +723,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
 
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -4.5 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 4.5) {
+            point.x >= -3.35 && point.x <= 6.5 &&
+            point.z >= -5 && point.z <= 4) {
           setHoverPosition([point.x, 0.06, point.z]);
           setHoverVisible(true);
         } else {
@@ -701,8 +740,8 @@ function CollisionGeometry({ onFloorClick, setHoverPosition, setHoverVisible, is
         
         const point = e.point;
         if (point.y < 0.5 && 
-            point.x >= -4.5 && point.x <= 7 &&
-            point.z >= -6.5 && point.z <= 4.5) {
+            point.x >= -3.35 && point.x <= 6.5 &&
+            point.z >= -5 && point.z <= 4) {
           onFloorClick(point);
         }
       }}
@@ -1311,8 +1350,8 @@ function useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn) {
     }
 
     // Keep camera within bounds and at proper height
-    camera.position.x = Math.max(-4.5, Math.min(7, camera.position.x));
-    camera.position.z = Math.max(-6.5, Math.min(4.5, camera.position.z));
+    camera.position.x = Math.max(-3.5, Math.min(6.5, camera.position.x));
+    camera.position.z = Math.max(-5, Math.min(4, camera.position.z));
     // camera.position.y = 1.75;
     if (!isZoomedIn) {
       camera.position.y = 1.5;
