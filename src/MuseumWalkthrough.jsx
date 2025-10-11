@@ -116,7 +116,7 @@ function Loader() {
 function SplatRoom() {
   const splatUrl = import.meta.env.MODE === 'development' 
     ? "/Splat5_V2.splat"
-    : "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/Splat5_V2.splat";
+    : "https://media.githubusercontent.com/media/ecksjeff/museum-react/main/public/Splat5_V2.splat";
   
   console.log('Splat URL', splatUrl);
 
