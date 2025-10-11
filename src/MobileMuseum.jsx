@@ -234,7 +234,7 @@ function TouchCameraControls({ isInteractiveMode, isAnimating, onCameraMove }) {
           const turnAmount = deltaX * 0.01 * TURN_SPEED;
           const euler = new THREE.Euler(0, 0, 0, 'YXZ');
           euler.setFromQuaternion(camera.quaternion);
-          euler.y -= turnAmount;
+          euler.y += turnAmount;
           camera.quaternion.setFromEuler(euler);
         } else {
           const moveAmount = -deltaY * 0.01 * MOVE_SPEED;

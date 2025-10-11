@@ -114,9 +114,10 @@ function Loader() {
 
 // Splat room component
 function SplatRoom() {
-  // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/living-room.splat"
-  // const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/House-Museum.splat"
-  const splatUrl = "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/Splat5.splat"
+  const splatUrl = import.meta.env.MODE === 'development' 
+    ? "/Splat5_V2.splat"
+    : "https://raw.githubusercontent.com/ecksjeff/museum-react/main/public/Splat5_V2.splat";
+  
   console.log('Splat URL', splatUrl);
 
   return (
