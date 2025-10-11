@@ -171,7 +171,7 @@ function MultiStageLoader({ splatUrl, onLoadComplete }) {
         } else {
           setProcessingProgress(progress);
         }
-      }, 150);
+      }, 300);
     }
 
     return () => {
