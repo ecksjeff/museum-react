@@ -50,7 +50,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-function LoadingScreen({ progress, isProcessing }) {
+function LoadingScreen({ progress, stage, isProcessing }) {
   return (
     <div style={{
       position: 'fixed',
@@ -58,7 +58,7 @@ function LoadingScreen({ progress, isProcessing }) {
       left: 0,
       width: '100vw',
       height: '100vh',
-      background: '#ffffffff',
+      background: '#ffffff',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
@@ -67,14 +67,15 @@ function LoadingScreen({ progress, isProcessing }) {
       color: 'grey'
     }}>
       <h2 style={{ marginBottom: '20px' }}>
-        {isProcessing ? 'Processing scene...' : 'Loading Museum...'}
+        {stage}
       </h2>
       <div style={{
         width: '300px',
         height: '20px',
-        background: 'rgba(255,255,255,0.2)',
+        background: 'rgba(200,200,200,0.3)',
         borderRadius: '10px',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        border: '1px solid #ccc'
       }}>
         <div style={{
           width: `${progress}%`,
@@ -84,26 +85,132 @@ function LoadingScreen({ progress, isProcessing }) {
         }}/>
       </div>
       <p style={{ marginTop: '10px', fontSize: '14px' }}>
-        {isProcessing ? 'Almost ready...' : `${Math.round(progress)}%`}
+        {Math.round(progress)}%
       </p>
     </div>
   );
 }
 
-function Loader() {
-  const { progress, active } = useProgress();
+// Multi-stage loader with download + processing simulation
+function MultiStageLoader({ splatUrl, onLoadComplete }) {
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [processingProgress, setProcessingProgress] = useState(0);
+  const [stage, setStage] = useState('download'); // 'download' | 'processing' | 'complete'
   const [shouldHide, setShouldHide] = useState(false);
+  const processingIntervalRef = useRef(null);
   const timeoutRef = useRef(null);
 
+  // Calculate total progress (download is 0-70%, processing is 70-100%)
+  const totalProgress = stage === 'download' 
+    ? downloadProgress * 0.7 
+    : 70 + (processingProgress * 0.3);
+
+  const stageText = stage === 'download' 
+    ? 'Downloading Museum...' 
+    : stage === 'processing'
+    ? 'Processing Scene...'
+    : 'Almost Ready...';
+
+  // Download tracking
   useEffect(() => {
-    if (progress >= 100) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
+    let mounted = true;
+
+    const downloadSplat = async () => {
+      try {
+        const response = await fetch(splatUrl);
+        const contentLength = response.headers.get('content-length');
+        
+        if (!contentLength) {
+          // Simulate download progress if no content-length
+          let simProgress = 0;
+          const simInterval = setInterval(() => {
+            simProgress += 15;
+            if (simProgress <= 100 && mounted) {
+              setDownloadProgress(Math.min(simProgress, 100));
+            } else {
+              clearInterval(simInterval);
+              if (mounted) {
+                setDownloadProgress(100);
+                setStage('processing');
+              }
+            }
+          }, 200);
+          
+          await response.blob();
+          clearInterval(simInterval);
+        } else {
+          // Track actual download progress
+          const total = parseInt(contentLength, 10);
+          const reader = response.body.getReader();
+          let receivedLength = 0;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) break;
+            
+            receivedLength += value.length;
+            const percentComplete = (receivedLength / total) * 100;
+            
+            if (mounted) {
+              setDownloadProgress(percentComplete);
+            }
+          }
+        }
+        
+        if (mounted) {
+          setDownloadProgress(100);
+          setStage('processing');
+        }
+      } catch (error) {
+        console.error('Error downloading splat:', error);
+        if (mounted) {
+          setDownloadProgress(100);
+          setStage('processing');
+        }
       }
+    };
+
+    downloadSplat();
+
+    return () => {
+      mounted = false;
+    };
+  }, [splatUrl]);
+
+  // Processing simulation (starts after download completes)
+  useEffect(() => {
+    if (stage === 'processing') {
+      let progress = 0;
       
+      // Simulate processing with variable speed
+      processingIntervalRef.current = setInterval(() => {
+        progress += Math.random() * 8 + 2; // Random increment between 2-10%
+        
+        if (progress >= 100) {
+          clearInterval(processingIntervalRef.current);
+          setProcessingProgress(100);
+          setStage('complete');
+        } else {
+          setProcessingProgress(progress);
+        }
+      }, 150);
+    }
+
+    return () => {
+      if (processingIntervalRef.current) {
+        clearInterval(processingIntervalRef.current);
+      }
+    };
+  }, [stage]);
+
+  // Hide loader after completion
+  useEffect(() => {
+    if (stage === 'complete') {
       timeoutRef.current = setTimeout(() => {
         setShouldHide(true);
-      }, 3000);
+        if (onLoadComplete) onLoadComplete();
+      }, 500);
     }
 
     return () => {
@@ -111,13 +218,7 @@ function Loader() {
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [progress]);
-
-  useEffect(() => {
-    if (!active && progress >= 100) {
-      setShouldHide(true);
-    }
-  }, [active, progress]);
+  }, [stage, onLoadComplete]);
 
   if (shouldHide) {
     return null;
@@ -125,8 +226,9 @@ function Loader() {
 
   return (
     <LoadingScreen 
-      progress={progress} 
-      isProcessing={progress >= 100} 
+      progress={totalProgress} 
+      stage={stageText}
+      isProcessing={stage === 'processing'}
     />
   );
 }
@@ -328,7 +430,7 @@ function MobileMuseum() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#000', touchAction: 'none' }}>
-      <Loader />
+      <MultiStageLoader />
 
       <Canvas shadows gl={{ antialias: false, powerPreference: 'default' }}>
         <PerspectiveCamera makeDefault position={[0, 1.5, 0]} fov={70} />
