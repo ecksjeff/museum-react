@@ -106,9 +106,9 @@ function MultiStageLoader({ splatUrl, onLoadComplete }) {
     : 70 + (processingProgress * 0.3);
 
   const stageText = stage === 'download' 
-    ? 'Downloading Museum...' 
+    ? 'Downloading Museum Exhibit...' 
     : stage === 'processing'
-    ? 'Processing Scene...'
+    ? 'Processing Museum Exhibit...'
     : 'Almost Ready...';
 
   // Download tracking
@@ -316,6 +316,10 @@ function TouchCameraControls({ isInteractiveMode, isAnimating, onCameraMove }) {
   const TURN_SPEED = 0.8;
 
   useEffect(() => {
+    camera.rotation.set(0, -Math.PI / 2, 0);
+  }, [camera]);
+
+  useEffect(() => {
     const handleTouchStart = (e) => {
       if (isInteractiveMode || isAnimating) return;
       const touch = e.touches[0];
@@ -433,7 +437,7 @@ function MobileMuseum() {
       <MultiStageLoader />
 
       <Canvas shadows gl={{ antialias: false, powerPreference: 'default' }}>
-        <PerspectiveCamera makeDefault position={[0, 1.5, 0]} fov={70} />
+        <PerspectiveCamera makeDefault position={[0, 1.5, -1]} fov={70} />
         
         <TouchCameraControls 
           isInteractiveMode={isInteractiveMode} 

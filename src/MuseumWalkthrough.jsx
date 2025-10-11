@@ -83,9 +83,9 @@ function MultiStageLoader({ splatUrl, onLoadComplete }) {
     : 70 + (processingProgress * 0.3);
 
   const stageText = stage === 'download' 
-    ? 'Downloading Museum...' 
+    ? 'Downloading Museum Exhibit...' 
     : stage === 'processing'
-    ? 'Processing Scene...'
+    ? 'Processing Museum Exhibit...'
     : 'Almost Ready...';
 
   // Download tracking
@@ -889,7 +889,8 @@ function CameraController({
   useKeyboardMovement(camera, isMoving, isInteractiveMode, isZoomedIn);
 
   useEffect(() => {
-    camera.position.set(0, 1.5, 0);
+    camera.position.set(0, 1.5, -1);
+    camera.rotation.set(0, -Math.PI / 2, 0); // Same rotation as "Center" preset
   }, [camera]);
 
   useFrame((state) => {
@@ -1491,7 +1492,7 @@ function MuseumWalkthrough() {
   const [destinationPosition, setDestinationPosition] = useState([0, 0.05, 0]);
   const [hoverVisible, setHoverVisible] = useState(false);
   const [hoverPosition, setHoverPosition] = useState([0, 0.06, 0]);
-  const originalCameraPosition = useRef(new THREE.Vector3(0, 2.5, 0));
+  const originalCameraPosition = useRef(new THREE.Vector3(0, 1.5, -1));
   const originalCameraQuaternion = useRef(new THREE.Quaternion());
   const animationResetRef = useRef();
   
@@ -1525,27 +1526,27 @@ function MuseumWalkthrough() {
   const presetLocations = useMemo(() => [
     {
       name: "Center",
-      position: [1, 2.5, 0]
+      position: [0, 1.5, -1]
     },
     {
       name: "North Wall",
-      position: [1.5, 2.5, -2]
+      position: [1.5, 1.5, -2]
     },
     {
       name: "South Wall", 
-      position: [1.75, 2.5, 2]
+      position: [1.75, 1.5, 2]
     },
     {
       name: "West Wall",
-      position: [2, 2.5, 0]
+      position: [2, 1.5, 0]
     },
     {
       name: "East Wall",
-      position: [2, 2.5, -1]
+      position: [2, 1.5, -1]
     },
     {
       name: "Table View",
-      position: [1.75, 2.5, 1.5]
+      position: [1.75, 1.5, 1.5]
     }
   ], []);
 
@@ -1588,7 +1589,7 @@ function MuseumWalkthrough() {
           break;
         case "Center":
         default:
-          cameraRef.current.rotation.set(0, 0, 0);
+          cameraRef.current.rotation.set(0, -Math.PI / 2, 0);
           break;
       }
     }
@@ -1735,7 +1736,7 @@ function MuseumWalkthrough() {
       <MultiStageLoader />
 
       <Canvas shadows style={{ background: '#f0f0f0' }}>
-        <PerspectiveCamera makeDefault position={[0, 2, 0]} fov={70} />
+        <PerspectiveCamera makeDefault position={[0, 1.5, -1]} fov={70} />
         
         <CameraCapture cameraRef={cameraRef} />
 
