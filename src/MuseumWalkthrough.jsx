@@ -213,8 +213,8 @@ function MultiStageLoader({ splatUrl, onLoadComplete }) {
 // Splat room component
 function SplatRoom() {
   const splatUrl = import.meta.env.MODE === 'development' 
-    ? "/Splat5_V2.splat"
-    : "https://media.githubusercontent.com/media/ecksjeff/museum-react/main/public/Splat5_V2.splat";
+    ? "/Splat5_V2_2MSplats.splat"
+    : "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat5_V2.splat";
   
   console.log('Splat URL', splatUrl);
 
