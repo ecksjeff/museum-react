@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { isMobileDevice } from './DeviceDetection';
 import MuseumWalkthrough from './MuseumWalkthrough'; // Your original desktop component
-import MobileMuseum from './MobileMuseum';
+import MobileMuseum from './PlayCanvasMuseumMobile';
 import PlayCanvasMuseum from './PlayCanvasMuseum';
+import PlayCanvasMuseumMobile from './PlayCanvasMuseumMobile';
 
 function App() {
   const [deviceType, setDeviceType] = useState(null);
@@ -46,7 +47,7 @@ function App() {
 
   return (
     <>
-      {deviceType === 'mobile' ? <MobileMuseum /> : <PlayCanvasMuseum />}
+      {deviceType === 'mobile' ? <PlayCanvasMuseumMobile /> : <PlayCanvasMuseum />}
       
       {/* Version switcher button */}
       <button

@@ -99,8 +99,6 @@ function PlayCanvasMuseum() {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);  
-  const [targetPosition, setTargetPosition] = useState(null);
-  const [isMoving, setIsMoving] = useState(false);
 
   // --- Handle window resize ---
   useEffect(() => {
