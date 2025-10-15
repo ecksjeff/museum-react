@@ -99,6 +99,8 @@ function PlayCanvasMuseum() {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);  
+  const [targetPosition, setTargetPosition] = useState(null);
+  const [isMoving, setIsMoving] = useState(false);
 
   // --- Handle window resize ---
   useEffect(() => {
@@ -157,13 +159,13 @@ function PlayCanvasMuseum() {
     app.start();
 
     // Add ambient light AFTER starting the app
-    const ambientLight = new pc.Entity('ambient-light');
-    ambientLight.addComponent('light', {
-      type: 'ambient',
-      color: new pc.Color(1, 1, 1),
-      intensity: 0.8
-    });
-    app.root.addChild(ambientLight);
+    // const ambientLight = new pc.Entity('ambient-light');
+    // ambientLight.addComponent('light', {
+    //   type: 'ambient',
+    //   color: new pc.Color(1, 1, 1),
+    //   intensity: 0.8
+    // });
+    // app.root.addChild(ambientLight);
 
     console.log('Loading splat...');
     const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat5_V2.sog";
@@ -322,14 +324,20 @@ function PlayCanvasMuseum() {
             // Track dragging to prevent accidental clicks on ANY interactive element
             let isDragging = false;
             let mouseDownPosition = { x: 0, y: 0 };
+            let isMouseDown = false;
 
             canvas.addEventListener('mousedown', (event) => {
               mouseDownPosition = { x: event.clientX, y: event.clientY };
               isDragging = false;
+              isMouseDown = true; 
             });
 
             // Set up click detection for tables using proper raycasting
             canvas.addEventListener('click', (event) => {
+              if (window.movementState && window.movementState.isMoving) {
+                return;
+              }
+
               // Prevent accidental clicks during camera drag
               if (isDragging) {
                 isDragging = false;
@@ -351,17 +359,15 @@ function PlayCanvasMuseum() {
               const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
               const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
               
-              // Check all mesh instances for intersection
+              // First check for table clicks
+              let clickedTable = null;
               if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
                 let closestDistance = Infinity;
-                let clickedTable = null;
                 
                 interactiveEntity.model.meshInstances.forEach((mi, index) => {
                   const materialName = mi.material.name;
                   
-                  // Check if this is one of the table materials
                   if (materialName.includes('pasted__tableSG')) {
-                    // Manual ray-AABB intersection test
                     const aabb = mi.aabb;
                     const min = aabb.getMin();
                     const max = aabb.getMax();
@@ -397,12 +403,59 @@ function PlayCanvasMuseum() {
                 if (clickedTable) {
                   console.log(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
                   setIsInteractiveMode(true);
+                  return; // Don't process floor click
+                }
+              }
+              
+              // If no table clicked, check for floor click using collision box bounds
+              if (window.collisionMesh && window.collisionMesh.model) {
+                const aabb = window.collisionMesh.model.meshInstances[0]?.aabb;
+                if (aabb) {
+                  const t = -cameraPos.y / rayDirection.y;
+                  
+                  if (t > 0) {
+                    const intersectionPoint = new pc.Vec3(
+                      cameraPos.x + rayDirection.x * t,
+                      0,
+                      cameraPos.z + rayDirection.z * t
+                    );
+                    
+                    const min = aabb.getMin();
+                    const max = aabb.getMax();
+                    
+                    if (intersectionPoint.x >= min.x && intersectionPoint.x <= max.x &&
+                        intersectionPoint.z >= min.z && intersectionPoint.z <= max.z) {
+                      console.log('Floor clicked at:', intersectionPoint);
+                      
+                      // Set the target at camera height (1.5)
+                      const targetPos = new pc.Vec3(intersectionPoint.x, 1.5, intersectionPoint.z);
+                      window.movementState.targetPosition = targetPos;
+                      window.movementState.isMoving = true;
+                      
+                      // Show destination marker and hide hover marker
+                      if (window.floorMarkers) {
+                        window.floorMarkers.destination.setPosition(intersectionPoint.x, 0.005, intersectionPoint.z);
+                        window.floorMarkers.destination.enabled = true;
+                        window.floorMarkers.hover.enabled = false;
+                      }
+                    }
+                  }
                 }
               }
             });
             
             //hover
             canvas.addEventListener('mousemove', (event) => {
+              // Don't show hover ring while moving
+              if (window.movementState && window.movementState.isMoving) {
+                if (window.floorMarkers) {
+                  window.floorMarkers.hover.enabled = false;
+                }
+                canvas.style.cursor = 'grab';
+                return;
+              }
+
+              // Check if dragging
               if (mouseDownPosition.x !== undefined) {
                 const dragDistance = Math.sqrt(
                   Math.pow(event.clientX - mouseDownPosition.x, 2) + 
@@ -411,64 +464,108 @@ function PlayCanvasMuseum() {
                 if (dragDistance > 5) {
                   isDragging = true;
                 }
+              } else {
+                // Reset dragging if no mousedown position
+                isDragging = false;
               }
-            const camera = app.root.findByName('camera');
-            if (!camera) return;
-            
-            const cameraComponent = camera.camera;
-            
-            // Get mouse coordinates
-            const x = event.clientX;
-            const y = event.clientY;
-            
-            // Get camera position and create ray direction
-            const cameraPos = camera.getPosition();
-            const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
-            const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
-            
-            let hoveredTable = false;
-            
-            // Check all mesh instances for intersection (same logic as click)
-            if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-              interactiveEntity.model.meshInstances.forEach((mi) => {
-                const materialName = mi.material.name;
-                
-                if (materialName.includes('pasted__tableSG')) {
-                  const aabb = mi.aabb;
-                  const min = aabb.getMin();
-                  const max = aabb.getMax();
+
+              const camera = app.root.findByName('camera');
+              if (!camera) return;
+              
+              const cameraComponent = camera.camera;
+              
+              // Get mouse coordinates
+              const x = event.clientX;
+              const y = event.clientY;
+              
+              // Get camera position and create ray direction
+              const cameraPos = camera.getPosition();
+              const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
+              const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+              
+              let hoveredTable = false;
+              let hoveredFloor = false;
+              
+              // Check table hover first
+              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                interactiveEntity.model.meshInstances.forEach((mi) => {
+                  const materialName = mi.material.name;
                   
-                  let tmin = (min.x - cameraPos.x) / rayDirection.x;
-                  let tmax = (max.x - cameraPos.x) / rayDirection.x;
-                  if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+                  if (materialName.includes('pasted__tableSG')) {
+                    const aabb = mi.aabb;
+                    const min = aabb.getMin();
+                    const max = aabb.getMax();
+                    
+                    let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                    let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+                    
+                    let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                    let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+                    
+                    if (tmin > tymax || tymin > tmax) return;
+                    
+                    tmin = Math.max(tmin, tymin);
+                    tmax = Math.min(tmax, tymax);
+                    
+                    let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                    let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+                    
+                    if (tmin > tzmax || tzmin > tmax) return;
+                    
+                    tmin = Math.max(tmin, tzmin);
+                    
+                    if (tmin > 0) {
+                      hoveredTable = true;
+                    }
+                  }
+                });
+              }
+              
+              // If not hovering table, check floor
+              if (!hoveredTable && window.collisionMesh && window.collisionMesh.model) {
+                const aabb = window.collisionMesh.model.meshInstances[0]?.aabb;
+                if (aabb) {
+                  const t = -cameraPos.y / rayDirection.y;
                   
-                  let tymin = (min.y - cameraPos.y) / rayDirection.y;
-                  let tymax = (max.y - cameraPos.y) / rayDirection.y;
-                  if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
-                  
-                  if (tmin > tymax || tymin > tmax) return;
-                  
-                  tmin = Math.max(tmin, tymin);
-                  tmax = Math.min(tmax, tymax);
-                  
-                  let tzmin = (min.z - cameraPos.z) / rayDirection.z;
-                  let tzmax = (max.z - cameraPos.z) / rayDirection.z;
-                  if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
-                  
-                  if (tmin > tzmax || tzmin > tmax) return;
-                  
-                  tmin = Math.max(tmin, tzmin);
-                  
-                  if (tmin > 0) {
-                    hoveredTable = true;
+                  if (t > 0) {
+                    const intersectionPoint = new pc.Vec3(
+                      cameraPos.x + rayDirection.x * t,
+                      0,
+                      cameraPos.z + rayDirection.z * t
+                    );
+                    
+                    const min = aabb.getMin();
+                    const max = aabb.getMax();
+                    
+                    if (intersectionPoint.x >= min.x && intersectionPoint.x <= max.x &&
+                        intersectionPoint.z >= min.z && intersectionPoint.z <= max.z) {
+                      hoveredFloor = true;
+                      
+                      // Show and position hover marker
+                      if (window.floorMarkers) {
+                        window.floorMarkers.hover.setPosition(intersectionPoint.x, 0.005, intersectionPoint.z);
+                        window.floorMarkers.hover.enabled = true;
+                      }
+                    }
                   }
                 }
-              });
-            }
-            
-            // Change cursor based on hover
-            canvas.style.cursor = hoveredTable ? 'pointer' : 'grab';
-          });
+              }
+              
+              // Hide hover marker if not hovering floor
+              if (!hoveredFloor && window.floorMarkers) {
+                window.floorMarkers.hover.enabled = false;
+              }
+              
+              // Change cursor based on hover
+              if (isMouseDown && isDragging) {
+                canvas.style.cursor = 'grabbing'; // Keep grabbing cursor while dragging
+              } else {
+                canvas.style.cursor = hoveredTable ? 'pointer' : (hoveredFloor ? 'pointer' : 'grab');
+              }
+            });
 
           });
           interactiveAsset.on('error', (err) => console.error('Error loading interactive mesh:', err));
@@ -483,6 +580,99 @@ function PlayCanvasMuseum() {
           setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
 
           setIsLoaded(true);
+
+          // Helper function to create a ring mesh
+          function createRingMesh(innerRadius, outerRadius, segments) {
+            const vertices = [];
+            const normals = [];
+            const indices = [];
+            
+            for (let i = 0; i <= segments; i++) {
+              const angle = (i / segments) * Math.PI * 2;
+              const cos = Math.cos(angle);
+              const sin = Math.sin(angle);
+              
+              // Inner vertex
+              vertices.push(innerRadius * cos, 0, innerRadius * sin);
+              normals.push(0, 1, 0); // Normal pointing up
+              
+              // Outer vertex
+              vertices.push(outerRadius * cos, 0, outerRadius * sin);
+              normals.push(0, 1, 0); // Normal pointing up
+            }
+            
+            for (let i = 0; i < segments; i++) {
+              const a = i * 2;
+              const b = a + 1;
+              const c = a + 2;
+              const d = a + 3;
+              
+              indices.push(a, c, b);
+              indices.push(b, c, d);
+            }
+            
+            const mesh = pc.createMesh(app.graphicsDevice, vertices, {
+              normals: normals,
+              indices: indices
+            });
+            
+            return mesh;
+          }
+
+          // Create hover marker (white ring)
+          const hoverMarker = new pc.Entity('hover-marker');
+          hoverMarker.addComponent('render', {
+            type: 'asset',
+            meshInstances: []
+          });
+
+          setTimeout(() => {
+            const hoverMesh = createRingMesh(0.3, 0.4, 32);
+            const hoverMaterial = new pc.StandardMaterial();
+            hoverMaterial.emissive = new pc.Color(1, 1, 1);
+            hoverMaterial.emissiveIntensity = 0.5;
+            hoverMaterial.opacity = 0.1; // Make fully opaque
+            hoverMaterial.blendType = pc.BLEND_NONE; // No blending
+            hoverMaterial.depthWrite = true; // Write depth
+            hoverMaterial.depthTest = true; // Test depth
+            hoverMaterial.cull = pc.CULLFACE_NONE;
+            hoverMaterial.update();
+            
+            const hoverMeshInstance = new pc.MeshInstance(hoverMesh, hoverMaterial);
+            hoverMarker.render.meshInstances = [hoverMeshInstance];
+            hoverMarker.enabled = false;
+          }, 100);
+
+          app.root.addChild(hoverMarker);
+
+          // Create destination marker (green ring)
+          const destinationMarker = new pc.Entity('destination-marker');
+          destinationMarker.addComponent('render', {
+            type: 'asset',
+            meshInstances: []
+          });
+
+          setTimeout(() => {
+            const destMesh = createRingMesh(0.3, 0.4, 32);
+            const destMaterial = new pc.StandardMaterial();
+            destMaterial.emissive = new pc.Color(0, 1, 0);
+            destMaterial.emissiveIntensity = 1.0;
+            destMaterial.opacity = 0.7;
+            destMaterial.blendType = pc.BLEND_NONE;
+            destMaterial.depthWrite = true;
+            destMaterial.depthTest = true;
+            destMaterial.cull = pc.CULLFACE_NONE;
+            destMaterial.update();
+            
+            const destMeshInstance = new pc.MeshInstance(destMesh, destMaterial);
+            destinationMarker.render.meshInstances = [destMeshInstance];
+            destinationMarker.enabled = false;
+          }, 100);
+
+          app.root.addChild(destinationMarker);
+
+          window.floorMarkers = { hover: hoverMarker, destination: destinationMarker };
+
           addMouseLook(app, camera, canvas);
           addWASDMovement(app, camera);
         });
@@ -614,7 +804,7 @@ function addMouseLook(app, camera, canvas) {
     const deltaX = e.clientX - lastX;
     const deltaY = e.clientY - lastY;
     rotation.y += deltaX * 0.1;
-    rotation.x -= deltaY * 0.1;
+    rotation.x += deltaY * 0.1;
     rotation.x = Math.max(-85, Math.min(85, rotation.x));
     camera.setLocalEulerAngles(rotation.x, rotation.y, 0);
     lastX = e.clientX;
@@ -631,7 +821,7 @@ function addMouseLook(app, camera, canvas) {
   canvas.style.cursor = 'grab';
 }
 
-// WASD controls
+// WASD controls and click-to-move
 function addWASDMovement(app, camera) {
   const keys = {};
   const moveSpeed = 3.0;
@@ -639,7 +829,51 @@ function addWASDMovement(app, camera) {
   window.addEventListener('keydown', (e) => keys[e.code] = true);
   window.addEventListener('keyup', (e) => keys[e.code] = false);
 
+  // Store movement state on window
+  window.movementState = {
+    targetPosition: null,
+    isMoving: false,
+    moveStartTime: 0,
+    moveStartPosition: new pc.Vec3()
+  };
+
   app.on('update', (dt) => {
+    const moveState = window.movementState;
+
+    // Handle click-to-move
+    if (moveState.isMoving && moveState.targetPosition) {
+      if (moveState.moveStartTime === 0) {
+        moveState.moveStartTime = Date.now();
+        moveState.moveStartPosition.copy(camera.getPosition());
+      }
+
+      const elapsed = Date.now() - moveState.moveStartTime;
+      const progress = Math.min(elapsed / 1000, 1);
+      
+      const easeProgress = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      camera.setPosition(
+        moveState.moveStartPosition.x + (moveState.targetPosition.x - moveState.moveStartPosition.x) * easeProgress,
+        1.5,
+        moveState.moveStartPosition.z + (moveState.targetPosition.z - moveState.moveStartPosition.z) * easeProgress
+      );
+
+      if (progress >= 1) {
+        moveState.moveStartTime = 0;
+        moveState.isMoving = false;
+        moveState.targetPosition = null;
+
+        // Hide destination marker
+        if (window.floorMarkers) {
+          window.floorMarkers.destination.enabled = false;
+        }
+      }
+      return;
+    }
+
+    // Handle WASD movement
     const currentPos = camera.getPosition().clone();
     const newPos = currentPos.clone();
     let moved = false;
@@ -671,42 +905,23 @@ function addWASDMovement(app, camera) {
       const aabb = window.collisionMesh.model.meshInstances[0]?.aabb;
       
       if (aabb) {
-        // Check if new position is inside bounds
         if (aabb.containsPoint(newPos)) {
-          // Inside bounds, move freely
           newPos.y = 1.5;
           camera.setPosition(newPos);
         } else {
-          // Outside bounds, try sliding along walls
-          // Try moving only on X axis
           const slideX = new pc.Vec3(newPos.x, 1.5, currentPos.z);
           if (aabb.containsPoint(slideX)) {
             camera.setPosition(slideX);
             return;
           }
           
-          // Try moving only on Z axis
           const slideZ = new pc.Vec3(currentPos.x, 1.5, newPos.z);
           if (aabb.containsPoint(slideZ)) {
             camera.setPosition(slideZ);
             return;
           }
-          
-          // Can't move in either direction, stay put
         }
-      } else {
-        // Fallback
-        newPos.x = Math.max(-8, Math.min(0, newPos.x));
-        newPos.z = Math.max(-4, Math.min(4, newPos.z));
-        newPos.y = 1.5;
-        camera.setPosition(newPos);
       }
-    } else {
-      // Fallback
-      newPos.x = Math.max(-8, Math.min(0, newPos.x));
-      newPos.z = Math.max(-4, Math.min(4, newPos.z));
-      newPos.y = 1.5;
-      camera.setPosition(newPos);
     }
   });
 }
