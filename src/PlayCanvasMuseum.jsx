@@ -58,26 +58,70 @@ function PlayCanvasMuseum() {
 
     console.log('Loading splat...');
     const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat5_V2.sog";
-    const asset = new pc.Asset('museum-splat', 'gsplat', { url: splatUrl });
 
-    asset.on('load', () => {
-      console.log('Splat loaded! Adding to running scene...');
-      const splatEntity = new pc.Entity('splat');
-      splatEntity.addComponent('gsplat', { asset: asset.id });
-      splatEntity.setPosition(0, 0, 0);
-      splatEntity.setLocalScale(1.2, 1.2, 1.2);
-      splatEntity.setEulerAngles(180, 0, 0);
-      app.root.addChild(splatEntity);
+    // Track download progress with XHR
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', splatUrl, true);
+    xhr.responseType = 'arraybuffer';
 
-      setIsLoaded(true);
-      addMouseLook(app, camera, canvas);
-      addWASDMovement(app, camera);
-    });
+    xhr.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percentComplete = (event.loaded / event.total) * 100;
+        setLoadProgress(percentComplete);
+        console.log('Download progress:', Math.round(percentComplete) + '%');
+      } else {
+        // If we can't track, show indeterminate progress
+        setLoadProgress(prev => Math.min(prev + 5, 90));
+      }
+    };
 
-    asset.on('error', (err) => console.error('Error loading splat:', err));
-    app.assets.add(asset);
-    app.assets.load(asset);
-  }, [canvasSize.width, canvasSize.height]);
+    xhr.onload = () => {
+      if (xhr.status === 200) {
+        console.log('Download complete, processing...');
+        setLoadProgress(95);
+        
+        // Create blob URL from the downloaded data
+        const blob = new Blob([xhr.response]);
+        const blobUrl = URL.createObjectURL(blob);
+        
+        // Now load into PlayCanvas
+        const asset = new pc.Asset('museum-splat', 'gsplat', { 
+          url: blobUrl,
+          filename: 'Splat5_V2.sog'  // Add this - tells PlayCanvas the format
+        });
+
+        asset.on('load', () => {
+          console.log('Splat loaded! Adding to running scene...');
+          setLoadProgress(100);
+          
+          const splatEntity = new pc.Entity('splat');
+          splatEntity.addComponent('gsplat', { asset: asset.id });
+          splatEntity.setPosition(0, 0, 0);
+          splatEntity.setLocalScale(1.2, 1.2, 1.2);
+          splatEntity.setEulerAngles(180, 0, 0);
+          app.root.addChild(splatEntity);
+
+          // Clean up blob URL
+          URL.revokeObjectURL(blobUrl);
+
+          setIsLoaded(true);
+          addMouseLook(app, camera, canvas);
+          addWASDMovement(app, camera);
+        });
+
+        asset.on('error', (err) => console.error('Error loading splat:', err));
+        app.assets.add(asset);
+        app.assets.load(asset);
+      }
+    };
+
+    xhr.onerror = () => {
+      console.error('Error downloading splat');
+      setLoadProgress(0);
+    };
+
+    xhr.send();
+  });
 
   // --- Only clean up when the component unmounts ---
   useEffect(() => {
@@ -112,7 +156,6 @@ function PlayCanvasMuseum() {
         const cameraEntity = appRef.current.root.findByName('camera');
         if (cameraEntity && cameraEntity.camera) {
           cameraEntity.camera.aspectRatio = width / height;
-          cameraEntity.camera.calculateProjection();
         }
       }
     };
