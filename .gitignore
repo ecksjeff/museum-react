@@ -19,6 +19,7 @@
 *.mb
 *.blend
 *.ply
+*.sog
 
 # Keep .glb files if they're essential and not too large
 # *.glb

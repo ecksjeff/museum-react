@@ -445,8 +445,8 @@ function MobileMuseum() {
           onCameraMove={handleClosePopup}
         />
 
-        <ambientLight intensity={1.5} />
-        <pointLight position={[0, 4, 8]} intensity={1.5} distance={15} />
+        {/* <ambientLight intensity={1.5} />
+        <pointLight position={[0, 4, 8]} intensity={1.5} distance={15} /> */}
 
         <Suspense fallback={<FallbackRoom />}>
           <SplatRoom />
