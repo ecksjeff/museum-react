@@ -124,11 +124,18 @@ function PlayCanvasMuseumMobile() {
 
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = canvasSize.width * dpr;
-    canvas.height = canvasSize.height * dpr;
+    // Cap DPR at 2 for mobile to prevent performance issues
+    const mobileDpr = Math.min(dpr, 2);
+    canvas.width = canvasSize.width * mobileDpr;
+    canvas.height = canvasSize.height * mobileDpr;
 
     const app = new pc.Application(canvas, {
-      touch: new pc.TouchDevice(canvas)
+    touch: new pc.TouchDevice(canvas),
+    graphicsDeviceOptions: {
+        alpha: false,
+        antialias: false, // Disable for mobile performance
+        powerPreference: 'high-performance'
+    }
     });
 
     appRef.current = app;
@@ -402,10 +409,11 @@ function PlayCanvasMuseumMobile() {
         const canvas = canvasRef.current;
 
         const dpr = window.devicePixelRatio || 1;
+        const mobileDpr = Math.min(dpr, 2);
         canvas.style.width = width + 'px';
         canvas.style.height = height + 'px';
-        canvas.width = width * dpr;
-        canvas.height = height * dpr;
+        canvas.width = width * mobileDpr;
+        canvas.height = height * mobileDpr;
 
         appRef.current.resizeCanvas(width, height);
 
@@ -478,21 +486,17 @@ function addTouchControls(app, camera, canvas) {
   let touchStartPos = { x: 0, y: 0 };
   let isTouching = false;
   const MOVE_SPEED = 2.5;
-  const TURN_SPEED = 0.5; // Reduced for smoother feel
+  const TURN_SPEED = 0.8;
   
   // Smooth rotation tracking
-  let targetRotationY = 0;
-  let currentRotationY = 0;
+  let angularVelocity = 0;
+  let targetAngularVelocity = 0;
 
   canvas.addEventListener('touchstart', (e) => {
     const touch = e.touches[0];
     touchStartPos = { x: touch.clientX, y: touch.clientY };
     isTouching = true;
-    
-    // Initialize rotation values
-    const currentRot = camera.getLocalEulerAngles();
-    currentRotationY = currentRot.y;
-    targetRotationY = currentRot.y;
+    targetAngularVelocity = 0;
   });
 
   canvas.addEventListener('touchmove', (e) => {
@@ -504,9 +508,8 @@ function addTouchControls(app, camera, canvas) {
     const deltaY = touch.clientY - touchStartPos.y;
 
     if (Math.abs(deltaX) > Math.abs(deltaY)) {
-      // Horizontal swipe - update target rotation
-      const turnAmount = deltaX * 0.15 * TURN_SPEED;
-      targetRotationY += turnAmount;
+      // Horizontal swipe - set rotation velocity
+      targetAngularVelocity = deltaX * 0.2 * TURN_SPEED;
     } else {
       // Vertical swipe - move forward/back
       const moveAmount = -deltaY * 0.01 * MOVE_SPEED;
@@ -535,16 +538,24 @@ function addTouchControls(app, camera, canvas) {
 
   canvas.addEventListener('touchend', () => {
     isTouching = false;
+    targetAngularVelocity = 0;
   });
 
-  // Smooth interpolation update loop
+  // Smooth rotation update using quaternions (no gimbal lock!)
   app.on('update', (dt) => {
-    // Smoothly interpolate to target rotation
-    const lerpFactor = Math.min(dt * 12, 1); // Adjust 12 for smoothness (higher = snappier)
-    currentRotationY += (targetRotationY - currentRotationY) * lerpFactor;
+    // Smoothly interpolate angular velocity
+    const lerpFactor = Math.min(dt * 10, 1);
+    angularVelocity += (targetAngularVelocity - angularVelocity) * lerpFactor;
     
-    const currentRot = camera.getLocalEulerAngles();
-    camera.setLocalEulerAngles(currentRot.x, currentRotationY, currentRot.z);
+    // Decay velocity when not touching
+    if (!isTouching) {
+      angularVelocity *= 0.85;
+    }
+    
+    // Apply rotation using rotateLocal (quaternion-based, no gimbal lock)
+    if (Math.abs(angularVelocity) > 0.001) {
+    camera.rotateLocal(0, angularVelocity * dt * 60, 0); // Multiply by 60 for frame-rate independence
+    }
   });
 }
 
