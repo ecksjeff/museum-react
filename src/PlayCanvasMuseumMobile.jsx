@@ -211,7 +211,7 @@ function PlayCanvasMuseumMobile() {
     // app.root.addChild(ambientLight);
 
     console.log('Loading splat...');
-    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat5_V2.sog";
+    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat8.sog";
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', splatUrl, true);
