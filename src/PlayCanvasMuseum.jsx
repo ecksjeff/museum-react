@@ -98,7 +98,49 @@ function PlayCanvasMuseum() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);  
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0); 
+  const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
+  const [viewpoints] = useState([
+    { name: "Personal", position: [-4, 1.5, 0], rotation: [0, 0, 0] },
+    { name: "Family Table", position: [-1, 1.5, 0], rotation: [-25, -90, 0] },
+    { name: "Dodgers", position: [-7, 1.5, 2], rotation: [10, 180, 0] },
+    { name: "Politics", position: [-5.5, 1.5, 0.20], rotation: [7, 90, 0] }
+  ]);
+
+  const setViewpoint = (viewpointIndex) => {
+    if (appRef.current) {
+      const camera = appRef.current.root.findByName('camera');
+      if (camera) {
+        const viewpoint = viewpoints[viewpointIndex];
+        
+        // Store the transition state
+        if (!window.cameraTransition) {
+          window.cameraTransition = {
+            isTransitioning: false,
+            startPosition: new pc.Vec3(),
+            startRotation: new pc.Quat(),
+            targetPosition: new pc.Vec3(),
+            targetRotation: new pc.Quat(),
+            startTime: 0,
+            duration: 1500 // 1.5 second transition
+          };
+        }
+
+        const transition = window.cameraTransition;
+        transition.startPosition.copy(camera.getPosition());
+        transition.startRotation.copy(camera.getRotation()); // Get quaternion instead of euler
+        transition.targetPosition.set(...viewpoint.position);
+        
+        // Convert euler angles to quaternion for target
+        transition.targetRotation.setFromEulerAngles(...viewpoint.rotation);
+        
+        transition.startTime = Date.now();
+        transition.isTransitioning = true;
+        
+        setCurrentViewpointIndex(viewpointIndex);
+      }
+    }
+  };
 
   // --- Handle window resize ---
   useEffect(() => {
@@ -147,8 +189,8 @@ function PlayCanvasMuseum() {
       farClip: 1000,
       fov: 70
     });
-    camera.setPosition(0, 1.5, 0);
-    camera.lookAt(0, 0, 0);
+    camera.setPosition(-4, 1.5, 0);
+    camera.setEulerAngles(0, 0, 0);
     app.root.addChild(camera);
 
     // Initialize scene layers to prevent splitLights error
@@ -779,6 +821,63 @@ function PlayCanvasMuseum() {
           setCurrentPhotoIndex={setCurrentPhotoIndex}
         />
       )}
+      {isLoaded && (
+        <div style={{
+          position: 'absolute',
+          bottom: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '15px',
+          background: 'rgba(0, 0, 0, 0.7)',
+          padding: '15px 20px',
+          borderRadius: '12px',
+          zIndex: 100
+        }}>
+          <button
+            onClick={() => setViewpoint((currentViewpointIndex - 1 + viewpoints.length) % viewpoints.length)}
+            style={{
+              padding: '8px 12px',
+              background: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}
+          >
+            ←
+          </button>
+          
+          <div style={{
+            color: 'white',
+            fontSize: '16px',
+            minWidth: '150px',
+            textAlign: 'center',
+            fontWeight: '500'
+          }}>
+            {viewpoints[currentViewpointIndex].name}
+          </div>
+          
+          <button
+            onClick={() => setViewpoint((currentViewpointIndex + 1) % viewpoints.length)}
+            style={{
+              padding: '8px 12px',
+              background: '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: 'pointer',
+              fontSize: '18px',
+              fontWeight: 'bold'
+            }}
+          >
+            →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -788,7 +887,13 @@ function addMouseLook(app, camera, canvas) {
   let isDragging = false;
   let lastX = 0;
   let lastY = 0;
-  const rotation = { x: 0, y: 0 };
+  
+  // Get the camera's current rotation angles instead of starting at 0
+  const currentAngles = camera.getLocalEulerAngles();
+  const rotation = { x: currentAngles.x, y: currentAngles.y };
+
+  // Expose rotation so we can update it from viewpoint changes
+  window.mouseLookRotation = rotation;
 
   canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
@@ -837,6 +942,42 @@ function addWASDMovement(app, camera) {
 
   app.on('update', (dt) => {
     const moveState = window.movementState;
+
+    // Handle camera viewpoint transition with quaternions
+    if (window.cameraTransition && window.cameraTransition.isTransitioning) {
+      const transition = window.cameraTransition;
+      const elapsed = Date.now() - transition.startTime;
+      const progress = Math.min(elapsed / transition.duration, 1);
+      
+      // Ease in-out function for smoother motion
+      const easeProgress = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // Interpolate position
+      camera.setPosition(
+        transition.startPosition.x + (transition.targetPosition.x - transition.startPosition.x) * easeProgress,
+        transition.startPosition.y + (transition.targetPosition.y - transition.startPosition.y) * easeProgress,
+        transition.startPosition.z + (transition.targetPosition.z - transition.startPosition.z) * easeProgress
+      );
+
+      // Slerp (spherical interpolation) for smooth rotation without gimbal lock
+      const tempQuat = new pc.Quat();
+      tempQuat.slerp(transition.startRotation, transition.targetRotation, easeProgress);
+      camera.setRotation(tempQuat);
+      
+      // Update mouse look rotation to match final euler angles
+      if (progress >= 1) {
+        const finalEuler = camera.getEulerAngles();
+        if (window.mouseLookRotation) {
+          window.mouseLookRotation.x = finalEuler.x;
+          window.mouseLookRotation.y = finalEuler.y;
+        }
+        transition.isTransitioning = false;
+      }
+      
+      return; // Don't process other movement during transition
+    }
 
     // Handle click-to-move
     if (moveState.isMoving && moveState.targetPosition) {

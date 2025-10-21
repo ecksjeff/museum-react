@@ -54,8 +54,8 @@ function App() {
         onClick={() => switchVersion(deviceType === 'mobile' ? 'desktop' : 'mobile')}
         style={{
           position: 'fixed',
-          bottom: '20px',
-          right: '20px',
+          top: '10px',
+          right: '10px',
           background: 'rgba(0, 0, 0, 0.7)',
           color: 'white',
           border: '1px solid rgba(255, 255, 255, 0.3)',

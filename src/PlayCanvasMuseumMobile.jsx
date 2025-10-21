@@ -98,6 +98,48 @@ function PlayCanvasMuseumMobile() {
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+  const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
+  const [viewpoints] = useState([
+    { name: "Personal", position: [-4, 1.5, 0], rotation: [0, 0, 0] },
+    { name: "Family Table", position: [-3, 1.5, 0], rotation: [0, -90, 0] },
+    { name: "Dodgers", position: [-7, 1.5, 1], rotation: [0, 180, 0] },
+    { name: "Politics", position: [-4, 1.5, 0.20], rotation: [0, 90, 0] }
+    ]);
+
+    const setViewpoint = (viewpointIndex) => {
+    if (appRef.current) {
+        const camera = appRef.current.root.findByName('camera');
+        if (camera) {
+        const viewpoint = viewpoints[viewpointIndex];
+        
+        // Store the transition state
+        if (!window.cameraTransition) {
+            window.cameraTransition = {
+            isTransitioning: false,
+            startPosition: new pc.Vec3(),
+            startRotation: new pc.Quat(),
+            targetPosition: new pc.Vec3(),
+            targetRotation: new pc.Quat(),
+            startTime: 0,
+            duration: 1500 // 1.5 second transition
+            };
+        }
+
+        const transition = window.cameraTransition;
+        transition.startPosition.copy(camera.getPosition());
+        transition.startRotation.copy(camera.getRotation());
+        transition.targetPosition.set(...viewpoint.position);
+        
+        // Convert euler angles to quaternion for target
+        transition.targetRotation.setFromEulerAngles(...viewpoint.rotation);
+        
+        transition.startTime = Date.now();
+        transition.isTransitioning = true;
+        
+        setCurrentViewpointIndex(viewpointIndex);
+        }
+    }
+  };
 
   // --- Handle window resize ---
   useEffect(() => {
@@ -151,8 +193,8 @@ function PlayCanvasMuseumMobile() {
       farClip: 1000,
       fov: 70
     });
-    camera.setPosition(0, 1.5, 0);
-    camera.lookAt(0, 0, 0);
+    camera.setPosition(-4, 1.5, 0);
+    camera.setEulerAngles(0, 0, 0);
     app.root.addChild(camera);
 
     app.scene.layers.getLayerByName("World").enabled = true;
@@ -467,6 +509,68 @@ function PlayCanvasMuseumMobile() {
           <div>Tap table to interact</div>
         </div>
       )}
+        {isLoaded && (
+        <div style={{
+            position: 'fixed', // Changed from 'absolute' to 'fixed'
+            bottom: '40px', // Increased from '20px' to avoid browser UI
+            left: '50%',
+            transform: 'translateX(-50%)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            background: 'rgba(0, 0, 0, 0.8)', // Slightly more opaque
+            padding: '12px 18px',
+            borderRadius: '12px',
+            zIndex: 1000, // Increased z-index
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' // Add shadow for visibility
+        }}>
+            <button
+            onClick={() => setViewpoint((currentViewpointIndex - 1 + viewpoints.length) % viewpoints.length)}
+            style={{
+                padding: '10px 14px', // Slightly larger for easier tapping
+                background: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                minWidth: '44px', // iOS recommended tap target size
+                minHeight: '44px'
+            }}
+            >
+            ←
+            </button>
+            
+            <div style={{
+            color: 'white',
+            fontSize: '15px',
+            minWidth: '120px',
+            textAlign: 'center',
+            fontWeight: '500'
+            }}>
+            {viewpoints[currentViewpointIndex].name}
+            </div>
+            
+            <button
+            onClick={() => setViewpoint((currentViewpointIndex + 1) % viewpoints.length)}
+            style={{
+                padding: '10px 14px', // Slightly larger for easier tapping
+                background: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: 'pointer',
+                fontSize: '18px',
+                fontWeight: 'bold',
+                minWidth: '44px', // iOS recommended tap target size
+                minHeight: '44px'
+            }}
+            >
+            →
+            </button>
+        </div>
+        )}
 
       {isInteractiveMode && (
         <InteractiveOverlay 
@@ -481,7 +585,6 @@ function PlayCanvasMuseumMobile() {
   );
 }
 
-// Touch controls for mobile with smoothed rotation
 function addTouchControls(app, camera, canvas) {
   let touchStartPos = { x: 0, y: 0 };
   let isTouching = false;
@@ -541,9 +644,40 @@ function addTouchControls(app, camera, canvas) {
     targetAngularVelocity = 0;
   });
 
-  // Smooth rotation update using quaternions (no gimbal lock!)
+  // Update loop with camera transition support
   app.on('update', (dt) => {
-    // Smoothly interpolate angular velocity
+    // Handle camera viewpoint transition with quaternions
+    if (window.cameraTransition && window.cameraTransition.isTransitioning) {
+      const transition = window.cameraTransition;
+      const elapsed = Date.now() - transition.startTime;
+      const progress = Math.min(elapsed / transition.duration, 1);
+      
+      // Ease in-out function for smoother motion
+      const easeProgress = progress < 0.5 
+        ? 2 * progress * progress 
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+
+      // Interpolate position
+      camera.setPosition(
+        transition.startPosition.x + (transition.targetPosition.x - transition.startPosition.x) * easeProgress,
+        transition.startPosition.y + (transition.targetPosition.y - transition.startPosition.y) * easeProgress,
+        transition.startPosition.z + (transition.targetPosition.z - transition.startPosition.z) * easeProgress
+      );
+
+      // Slerp (spherical interpolation) for smooth rotation without gimbal lock
+      const tempQuat = new pc.Quat();
+      tempQuat.slerp(transition.startRotation, transition.targetRotation, easeProgress);
+      camera.setRotation(tempQuat);
+      
+      // Update is complete
+      if (progress >= 1) {
+        transition.isTransitioning = false;
+      }
+      
+      return; // Don't process touch movement during transition
+    }
+
+    // Smoothly interpolate angular velocity for touch controls
     const lerpFactor = Math.min(dt * 10, 1);
     angularVelocity += (targetAngularVelocity - angularVelocity) * lerpFactor;
     
@@ -554,7 +688,7 @@ function addTouchControls(app, camera, canvas) {
     
     // Apply rotation using rotateLocal (quaternion-based, no gimbal lock)
     if (Math.abs(angularVelocity) > 0.001) {
-    camera.rotateLocal(0, angularVelocity * dt * 60, 0); // Multiply by 60 for frame-rate independence
+      camera.rotateLocal(0, angularVelocity * dt * 60, 0);
     }
   });
 }
