@@ -887,14 +887,37 @@ function addMouseLook(app, camera, canvas) {
   let isDragging = false;
   let lastX = 0;
   let lastY = 0;
+  let accumulatedYaw = 0;
+  let accumulatedPitch = 0;
   
-  // Get the camera's current rotation angles instead of starting at 0
-  const currentAngles = camera.getLocalEulerAngles();
-  const rotation = { x: currentAngles.x, y: currentAngles.y };
-
-  // Expose rotation so we can update it from viewpoint changes
-  window.mouseLookRotation = rotation;
-
+  // Initialize from camera's starting rotation
+  const initialEuler = camera.getEulerAngles();
+  accumulatedYaw = initialEuler.y;
+  accumulatedPitch = initialEuler.x;
+  
+  // Expose a way to reset these when camera transitions happen
+  window.resetMouseLookTracking = () => {
+    const currentEuler = camera.getEulerAngles();
+    let pitch = currentEuler.x;
+    let yaw = currentEuler.y;
+    
+    // Normalize ONLY if we're in the flipped state (near 180 degrees yaw with extreme pitch)
+    if (pitch < -90 && Math.abs(Math.abs(currentEuler.z) - 180) < 1) {
+      // We're flipped - normalize it
+      pitch = pitch + 180;
+      yaw = yaw + 180;
+      
+      // Normalize yaw to -180 to 180
+      while (yaw > 180) yaw -= 360;
+      while (yaw < -180) yaw += 360;
+      
+      console.log('Normalized after transition:', pitch, yaw);
+    }
+    
+    accumulatedYaw = yaw;
+    accumulatedPitch = pitch;
+  };
+  
   canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
     lastX = e.clientX;
@@ -904,12 +927,24 @@ function addMouseLook(app, camera, canvas) {
 
   canvas.addEventListener('mousemove', (e) => {
     if (!isDragging) return;
+    
     const deltaX = e.clientX - lastX;
     const deltaY = e.clientY - lastY;
-    rotation.y += deltaX * 0.1;
-    rotation.x += deltaY * 0.1;
-    rotation.x = Math.max(-85, Math.min(85, rotation.x));
-    camera.setLocalEulerAngles(rotation.x, rotation.y, 0);
+    
+    // Update accumulated values
+    accumulatedYaw += deltaX * 0.1;
+    accumulatedPitch += deltaY * 0.1;
+    
+    // Clamp pitch only
+    accumulatedPitch = Math.max(-85, Math.min(85, accumulatedPitch));
+    
+    // Build rotation: yaw around world UP, pitch around local RIGHT
+    const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, accumulatedYaw);
+    const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, accumulatedPitch);
+    const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
+    
+    camera.setRotation(finalQuat);
+    
     lastX = e.clientX;
     lastY = e.clientY;
   });
@@ -968,12 +1003,11 @@ function addWASDMovement(app, camera) {
       
       // Update mouse look rotation to match final euler angles
       if (progress >= 1) {
-        const finalEuler = camera.getEulerAngles();
-        if (window.mouseLookRotation) {
-          window.mouseLookRotation.x = finalEuler.x;
-          window.mouseLookRotation.y = finalEuler.y;
-        }
         transition.isTransitioning = false;
+        // Reset the accumulated tracking values
+        if (window.resetMouseLookTracking) {
+          window.resetMouseLookTracking();
+        }
       }
       
       return; // Don't process other movement during transition
