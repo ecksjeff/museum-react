@@ -13,12 +13,12 @@ function PlayCanvasMuseumMobile() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
-  const [viewpoints] = useState([
-    { name: "Personal", position: [-4, 1.5, 0], rotation: [0, 0, 0] },
-    { name: "Family Table", position: [-3, 1.5, 0], rotation: [0, -90, 0] },
-    { name: "Dodgers", position: [-7, 1.5, 1], rotation: [0, 180, 0] },
-    { name: "Politics", position: [-4, 1.5, 0.20], rotation: [0, 90, 0] }
-    ]);
+	const [viewpoints] = useState([
+		{ name: "Personal", position: [-2, 1.5, 5.75], rotation: [0, 90, 0] },
+		{ name: "Family Table", position: [0, 1.5, 3], rotation: [0, 0, 0] },
+		{ name: "Dodgers", position: [3, 1.5, 9.25], rotation: [0, -90, 0] },
+		{ name: "Politics", position: [0.20, 1.5, 7], rotation: [0, 180, 0] }
+	]);
 
     const setViewpoint = (viewpointIndex) => {
     if (appRef.current) {
@@ -145,8 +145,9 @@ function PlayCanvasMuseumMobile() {
       farClip: 1000,
       fov: 70
     });
-    camera.setPosition(-4, 1.5, 0);
-    camera.setEulerAngles(0, 0, 0);
+		camera.camera.requestSceneColorMap(true);
+    camera.setPosition(0, 1.5, 5.75);
+    camera.setEulerAngles(0, 90, 0);
     app.root.addChild(camera);
 
     app.scene.layers.getLayerByName("World").enabled = true;
@@ -163,209 +164,259 @@ function PlayCanvasMuseumMobile() {
     // app.root.addChild(ambientLight);
 
     console.log('Loading splat...');
-    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat8.sog";
+    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/SplatFinal.sog";
 
     const xhr = new XMLHttpRequest();
     xhr.open('GET', splatUrl, true);
     xhr.responseType = 'arraybuffer';
 
     xhr.onprogress = (event) => {
-      if (event.lengthComputable) {
+    if (event.lengthComputable) {
         const percentComplete = (event.loaded / event.total) * 100;
-        setLoadProgress(percentComplete);
-      } else {
-        setLoadProgress(prev => Math.min(prev + 5, 90));
-      }
+        console.log(`Download progress: ${percentComplete.toFixed(1)}%`);
+        // Splat takes 0-70% of the loading bar
+        setLoadProgress(Math.floor(percentComplete * 0.7));
+    } else {
+        setLoadProgress(prev => Math.min(prev + 5, 65));
+    }
     };
 
     xhr.onload = () => {
-      if (xhr.status === 200) {
+    if (xhr.status === 200) {
         console.log('Download complete, processing...');
-        setLoadProgress(95);
+        setLoadProgress(75); // Splat done, now 75%
         
         const blob = new Blob([xhr.response]);
         const blobUrl = URL.createObjectURL(blob);
         
         const asset = new pc.Asset('museum-splat', 'gsplat', { 
-          url: blobUrl,
-          filename: 'Splat5_V2.sog'
+        url: blobUrl,
+        filename: 'Splat5_V2.sog'
         });
 
         asset.on('load', () => {
-          console.log('Splat loaded!');
-          setLoadProgress(100);
+        console.log('Splat loaded! Adding to running scene...');
+        setLoadProgress(80); // Splat added to scene
           
-          const splatEntity = new pc.Entity('splat');
-          splatEntity.addComponent('gsplat', { asset: asset.id });
-          splatEntity.setPosition(0, 0, 0);
-          splatEntity.setLocalScale(1.2, 1.2, 1.2);
-          splatEntity.setEulerAngles(180, 0, 0);
-          app.root.addChild(splatEntity);
+					const splatEntity = new pc.Entity('splat');
+					splatEntity.addComponent('gsplat', { asset: asset.id });
+					splatEntity.setPosition(3.1903, -0.18828, 2.7212);
+					splatEntity.setLocalScale(1.329, 1.329, 1.329);
+					splatEntity.setEulerAngles(181.246, 135.72, 1.25);
+					app.root.addChild(splatEntity);
 
-          // === LOAD COLLISION MESH ===
-          console.log('Loading collision mesh...');
-          const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube.glb";
-          const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
+					// === LOAD BOTH COLLISION AND INTERACTIVE MESH IN PARALLEL ===
+					console.log('Loading collision mesh...');
+					const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube_v2.glb";
+					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
-          collisionAsset.on('load', () => {
-            console.log('Collision mesh loaded!');
-            
-            const collisionEntity = new pc.Entity('collision-cube');
-            collisionEntity.addComponent('model', {
-              type: 'asset',
-              asset: collisionAsset
-            });
+					console.log('Loading interactive mesh...');
+					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v2.glb";
+					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
-            collisionEntity.enabled = true;
-            
-            setTimeout(() => {
-              if (collisionEntity.model?.meshInstances) {
-                collisionEntity.model.meshInstances.forEach((mi) => {
-                  mi.visible = false;
-                });
-              }
-            }, 100);
+					let collisionLoaded = false;
+					let interactiveLoaded = false;
 
-            collisionEntity.setPosition(-8.5, 0, .5);
-            collisionEntity.setLocalScale(0.8, 1, 0.8);
-            collisionEntity.setEulerAngles(0, 90, 0);
+					const checkBothLoaded = () => {
+						// if (collisionLoaded && interactiveLoaded) {
+						// 	console.log('Both meshes loaded! Showing scene...');
+						// 	setIsLoaded(true);
+						// }
+						if (collisionLoaded) {
+							console.log('Collision loaded! Showing scene...');
+							setIsLoaded(true);
+						}
+					};
 
-            app.root.addChild(collisionEntity);
-            window.collisionMesh = collisionEntity;
-          });
+					collisionAsset.on('load', () => {
+						console.log('Collision mesh loaded!');
+						
+						const collisionEntity = new pc.Entity('collision-cube');
+						collisionEntity.addComponent('model', {
+							type: 'asset',
+							asset: collisionAsset
+						});
 
-          // === LOAD INTERACTIVE MESH ===
-          console.log('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room.glb";
-          const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
+						collisionEntity.enabled = true;
+						
+						setTimeout(() => {
+							if (collisionEntity.model?.meshInstances) {
+								collisionEntity.model.meshInstances.forEach((mi) => {
+									mi.visible = false;
+								});
+							}
+						}, 100);
 
-          interactiveAsset.on('load', () => {
-            console.log('Interactive mesh loaded!');
-            
-            const interactiveEntity = interactiveAsset.resource.instantiateModelEntity();
-            
-            interactiveEntity.setPosition(1.35, 0, 0);
-            interactiveEntity.setLocalScale(1, 1, 1);
-            interactiveEntity.setEulerAngles(0, 270, 0);
+						collisionEntity.setPosition(0, 0, 0);
+						collisionEntity.setLocalScale(1, 1, 1);
+						collisionEntity.setEulerAngles(0, 0, 0);
 
-            // Make the mesh invisible
-            setTimeout(() => {
-              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                interactiveEntity.model.meshInstances.forEach((mi) => {
-                  mi.visible = false;
-                });
-              }
-            }, 100);
+						app.root.addChild(collisionEntity);
+						window.collisionMesh = collisionEntity;
+						
+						collisionLoaded = true;
+						checkBothLoaded();
+					});
 
-            app.root.addChild(interactiveEntity);
-            window.interactiveMesh = interactiveEntity;
+					interactiveAsset.on('load', () => {
+						console.log('Interactive mesh loaded!');
+						
+						const interactiveEntity = interactiveAsset.resource.instantiateModelEntity();
+						
+						interactiveEntity.setPosition(0, 0, 0);
+						interactiveEntity.setLocalScale(1, 1, 1);
+						interactiveEntity.setEulerAngles(0, 0, 0);
 
-            // Track touch for drag detection
-            let isTouching = false;
-            let touchStartPosition = { x: 0, y: 0 };
-            let isDragging = false;
+						// Make the mesh invisible immediately
+						if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+							interactiveEntity.model.meshInstances.forEach((mi) => {
+								mi.visible = false;
+							});
+						}
 
-            canvas.addEventListener('touchstart', (event) => {
-              const touch = event.touches[0];
-              touchStartPosition = { x: touch.clientX, y: touch.clientY };
-              isTouching = true;
-              isDragging = false;
-            });
+						app.root.addChild(interactiveEntity);
+						window.interactiveMesh = interactiveEntity;
 
-            canvas.addEventListener('touchmove', (event) => {
-              if (!isTouching) return;
-              
-              const touch = event.touches[0];
-              const dragDistance = Math.sqrt(
-                Math.pow(touch.clientX - touchStartPosition.x, 2) + 
-                Math.pow(touch.clientY - touchStartPosition.y, 2)
-              );
-              
-              if (dragDistance > 10) {
-                isDragging = true;
-              }
-            });
+						// Track touch for drag detection
+						let isTouching = false;
+						let touchStartPosition = { x: 0, y: 0 };
+						let isDragging = false;
 
-            canvas.addEventListener('touchend', (event) => {
-              if (!isTouching) return;
-              
-              // Only process tap if not dragging
-              if (!isDragging && event.changedTouches.length > 0) {
-                const touch = event.changedTouches[0];
-                const camera = app.root.findByName('camera');
-                if (!camera) return;
+						canvas.addEventListener('touchstart', (event) => {
+							const touch = event.touches[0];
+							touchStartPosition = { x: touch.clientX, y: touch.clientY };
+							isTouching = true;
+							isDragging = false;
+						});
 
-                const cameraComponent = camera.camera;
-                const x = touch.clientX;
-                const y = touch.clientY;
+						canvas.addEventListener('touchmove', (event) => {
+							if (!isTouching) return;
+							
+							const touch = event.touches[0];
+							const dragDistance = Math.sqrt(
+								Math.pow(touch.clientX - touchStartPosition.x, 2) + 
+								Math.pow(touch.clientY - touchStartPosition.y, 2)
+							);
+							
+							if (dragDistance > 10) {
+								isDragging = true;
+							}
+						});
 
-                const cameraPos = camera.getPosition();
-                const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
-                const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+						canvas.addEventListener('touchend', (event) => {
+							if (!isTouching) return;
+							
+							// Only process tap if not dragging
+							if (!isDragging && event.changedTouches.length > 0) {
+								const touch = event.changedTouches[0];
+								const camera = app.root.findByName('camera');
+								if (!camera) return;
 
-                // Check for table tap
-                if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                  let tappedTable = false;
+								const cameraComponent = camera.camera;
+								const x = touch.clientX;
+								const y = touch.clientY;
 
-                  interactiveEntity.model.meshInstances.forEach((mi) => {
-                    const materialName = mi.material.name;
+								const cameraPos = camera.getPosition();
+								const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
+								const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
 
-                    if (materialName.includes('pasted__tableSG')) {
-                      const aabb = mi.aabb;
-                      const min = aabb.getMin();
-                      const max = aabb.getMax();
+								// Check for table tap
+								if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+									let tappedTable = false;
 
-                      let tmin = (min.x - cameraPos.x) / rayDirection.x;
-                      let tmax = (max.x - cameraPos.x) / rayDirection.x;
-                      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+									interactiveEntity.model.meshInstances.forEach((mi) => {
+										const materialName = mi.material.name;
 
-                      let tymin = (min.y - cameraPos.y) / rayDirection.y;
-                      let tymax = (max.y - cameraPos.y) / rayDirection.y;
-                      if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+										if (materialName.includes('pasted__tableSG')) {
+											const aabb = mi.aabb;
+											const min = aabb.getMin();
+											const max = aabb.getMax();
 
-                      if (tmin > tymax || tymin > tmax) return;
+											let tmin = (min.x - cameraPos.x) / rayDirection.x;
+											let tmax = (max.x - cameraPos.x) / rayDirection.x;
+											if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
 
-                      tmin = Math.max(tmin, tymin);
-                      tmax = Math.min(tmax, tymax);
+											let tymin = (min.y - cameraPos.y) / rayDirection.y;
+											let tymax = (max.y - cameraPos.y) / rayDirection.y;
+											if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
 
-                      let tzmin = (min.z - cameraPos.z) / rayDirection.z;
-                      let tzmax = (max.z - cameraPos.z) / rayDirection.z;
-                      if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+											if (tmin > tymax || tymin > tmax) return;
 
-                      if (tmin > tzmax || tzmin > tmax) return;
+											tmin = Math.max(tmin, tymin);
+											tmax = Math.min(tmax, tymax);
 
-                      tmin = Math.max(tmin, tzmin);
+											let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+											let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+											if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
 
-                      if (tmin > 0) {
-                        tappedTable = true;
-                      }
-                    }
-                  });
+											if (tmin > tzmax || tzmin > tmax) return;
 
-                  if (tappedTable) {
-                    console.log('Table tapped!');
-                    setIsInteractiveMode(true);
-                  }
-                }
-              }
+											tmin = Math.max(tmin, tzmin);
 
-              isTouching = false;
-              isDragging = false;
-            });
-          });
+											if (tmin > 0) {
+												tappedTable = true;
+											}
+										}
+									});
 
-          interactiveAsset.on('error', (err) => console.error('Error loading interactive mesh:', err));
-          app.assets.add(interactiveAsset);
-          app.assets.load(interactiveAsset);
+									if (tappedTable) {
+										console.log('Table tapped!');
+										setIsInteractiveMode(true);
+									}
+								}
+							}
 
-          collisionAsset.on('error', (err) => console.error('Error loading collision mesh:', err));
-          app.assets.add(collisionAsset);
-          app.assets.load(collisionAsset);
+							isTouching = false;
+							isDragging = false;
+						});
+						
+						interactiveLoaded = true;
+						checkBothLoaded();
+					});
 
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+					// File sizes in bytes
+					const collisionSize = 2200;
+					const interactiveSize = 232605328;
+					const totalSize = collisionSize + interactiveSize;
 
-          setIsLoaded(true);
-          addTouchControls(app, camera, canvas);
+					let collisionBytesLoaded = 0;
+					let interactiveBytesLoaded = 0;
+					let lastProgressUpdate = 0;
+
+					const updateCombinedProgress = () => {
+						const now = Date.now();
+						if (now - lastProgressUpdate > 50) {
+							const totalLoaded = collisionBytesLoaded + interactiveBytesLoaded;
+							const percentLoaded = (totalLoaded / totalSize) * 100;
+							// Map 0-100% of download to 80-100% of loading bar
+							const progressPercent = 80 + (percentLoaded * 0.2);
+							setLoadProgress(Math.floor(progressPercent));
+							lastProgressUpdate = now;
+						}
+					};
+
+					collisionAsset.on('progress', (bytesLoaded) => {
+						collisionBytesLoaded = Math.min(bytesLoaded, collisionSize);
+						updateCombinedProgress();
+					});
+
+					interactiveAsset.on('progress', (bytesLoaded) => {
+						interactiveBytesLoaded = Math.min(bytesLoaded, interactiveSize);
+						updateCombinedProgress();
+					});
+
+					collisionAsset.on('error', (err) => console.error('Error loading collision mesh:', err));
+					app.assets.add(collisionAsset);
+					app.assets.load(collisionAsset);
+
+					interactiveAsset.on('error', (err) => console.error('Error loading interactive mesh:', err));
+					// app.assets.add(interactiveAsset);
+					// app.assets.load(interactiveAsset);
+
+					// Clean up blob URL
+					setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+
+					addTouchControls(app, camera, canvas);
         });
 
         asset.on('error', (err) => console.error('Error loading splat:', err));
