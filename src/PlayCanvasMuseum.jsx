@@ -12,6 +12,7 @@ function PlayCanvasMuseum() {
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
+  const [wallInteractionMode, setWallInteractionMode] = useState(null);
   const [viewpoints] = useState([
     { name: "Personal", position: [-2, 1.5, 5.75], rotation: [0, 90, 0] },
     { name: "Family Table", position: [0, 1.5, 2.5], rotation: [-25, 0, 0] },
@@ -24,6 +25,30 @@ function PlayCanvasMuseum() {
     { name: "Dodgers Wall", position: new pc.Vec3(7, 2.5, 9) },
     { name: "Politics Wall", position: new pc.Vec3(0, 2.5, 12) }
   ]);
+
+  const [wallDefinitions] = useState({
+    'Personal Wall': {
+      normal: new pc.Vec3(1, 0, 0),
+      center: new pc.Vec3(-6.5, 2.5, 5.75),
+      width: 5.5,
+      height: 3,
+      zoomDistance: 1.5
+    },
+    'Dodgers Wall': {
+      normal: new pc.Vec3(-1, 0, 0),
+      center: new pc.Vec3(7, 2.5, 9),
+      width: 4,
+      height: 3,
+      zoomDistance: 1.5
+    },
+    'Politics Wall': {
+      normal: new pc.Vec3(0, 0, -1),
+      center: new pc.Vec3(0, 2.5, 12),
+      width: 5,
+      height: 3,
+      zoomDistance: 1.5
+    }
+  });
 
   const setViewpoint = (viewpointIndex) => {
     if (appRef.current) {
@@ -61,6 +86,30 @@ function PlayCanvasMuseum() {
 
     return closestPoint;
   };
+
+  const exitWallMode = () => {
+    if (wallInteractionMode && appRef.current) {
+      const camera = appRef.current.root.findByName('camera');
+      if (camera && window.wallTransitionState) {
+        const prev = wallInteractionMode.previousCamera;
+        
+        window.wallTransitionState.isTransitioning = true;
+        window.wallTransitionState.startPosition = camera.getPosition().clone();
+        window.wallTransitionState.targetPosition = prev.position.clone();
+        window.wallTransitionState.startRotation = camera.getEulerAngles().clone();
+        window.wallTransitionState.targetRotation = prev.rotation.clone();
+        window.wallTransitionState.progress = 0;
+        window.wallTransitionState.duration = 1.0;
+        window.wallTransitionState.syncOnComplete = true; // Flag to sync after transition
+
+        window.wallPanState.isActive = false;
+        window.currentWallMode = null;
+        
+        setWallInteractionMode(null);
+      }
+    }
+  };
+  window.exitWallMode = exitWallMode;
 
   // --- Handle window resize ---
   useEffect(() => {
@@ -226,8 +275,19 @@ function PlayCanvasMuseum() {
 
           const checkBothLoaded = () => {
             if (collisionLoaded && interactiveLoaded) {
-              console.log('Both meshes loaded! Showing scene...');
-              setIsLoaded(true);
+              console.log('Both meshes loaded! Processing...');
+              
+              // Animate from 98% to 100% over 1 second to cover processing time
+              let currentProgress = 95;
+              const processingInterval = setInterval(() => {
+                currentProgress += 1;
+                setLoadProgress(currentProgress);
+                
+                if (currentProgress >= 100) {
+                  clearInterval(processingInterval);
+                  setIsLoaded(true);
+                }
+              }, 100); // 2 steps of 500ms = 1 second total
             }
           };
 
@@ -351,6 +411,11 @@ function PlayCanvasMuseum() {
                 return;
               }
 
+              // NEW: Check if in wall mode - ignore clicks (for future picture interaction)
+              if (wallInteractionMode) {
+                return;
+              }
+
               const camera = app.root.findByName('camera');
               if (!camera) return;
               
@@ -364,6 +429,81 @@ function PlayCanvasMuseum() {
               const cameraPos = camera.getPosition();
               const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
               const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+              
+              // NEW: First check for wall clicks using AABB intersection
+              console.log('🖱️ Click detected, checking for walls...');
+              let clickedWall = null;
+              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                console.log(`Found ${interactiveEntity.model.meshInstances.length} mesh instances to check`);
+                let closestWallDistance = Infinity;
+                
+                interactiveEntity.model.meshInstances.forEach((mi, index) => {
+                  const materialName = mi.material.name;
+                  console.log(`  [${index}] Material: ${materialName}`);
+                  
+                  // Check all mesh instances for hits, regardless of material name
+                  const aabb = mi.aabb;
+                  const min = aabb.getMin();
+                  const max = aabb.getMax();
+
+                  let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                  let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                  if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+                  let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                  let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                  if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+                  if (tmin > tymax || tymin > tmax) return;
+
+                  tmin = Math.max(tmin, tymin);
+                  tmax = Math.min(tmax, tymax);
+
+                  let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                  let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                  if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+                  if (tmin > tzmax || tzmin > tmax) return;
+
+                  tmin = Math.max(tmin, tzmin);
+
+                  if (tmin > 0 && tmin < closestWallDistance) {
+                    const hitPoint = new pc.Vec3(
+                      cameraPos.x + rayDirection.x * tmin,
+                      cameraPos.y + rayDirection.y * tmin,
+                      cameraPos.z + rayDirection.z * tmin
+                    );
+                    
+                    // Skip table materials
+                    if (materialName.includes('table') || materialName.includes('chair')) {
+                      return;
+                    }
+                    
+                    closestWallDistance = tmin;
+                    console.log(`    ✓ HIT! Material: ${materialName}, Distance: ${tmin}, Point:`, hitPoint);
+                    clickedWall = { name: materialName, index: index, hitPoint: hitPoint };
+                  }
+                });
+                
+                if (clickedWall) {
+                  console.log(`Clicked on wall: ${clickedWall.name}`);
+                  
+                  // Determine which wall based on material name or position
+                  let wallName = null;
+                  if (clickedWall.name.toLowerCase().includes('personal') || clickedWall.hitPoint.x < -3) {
+                    wallName = 'Personal Wall';
+                  } else if (clickedWall.name.toLowerCase().includes('dodger') || clickedWall.hitPoint.x > 3) {
+                    wallName = 'Dodgers Wall';
+                  } else if (clickedWall.name.toLowerCase().includes('politic') || clickedWall.hitPoint.z > 10) {
+                    wallName = 'Politics Wall';
+                  }
+                  
+                  if (wallName) {
+                    enterWallMode(wallName, clickedWall.hitPoint);
+                    return; // Don't process other clicks
+                  }
+                }
+              }
               
               // First check for table clicks
               let clickedTable = null;
@@ -640,19 +780,20 @@ function PlayCanvasMuseum() {
           const collisionSize = 2200;
           const interactiveSize = 232605328;
           const totalSize = collisionSize + interactiveSize;
-          
+
           let collisionBytesLoaded = 0;
           let interactiveBytesLoaded = 0;
           let lastProgressUpdate = 0;
 
           const updateCombinedProgress = () => {
             const now = Date.now();
-            if (now - lastProgressUpdate > 50) { // Throttle to every 50ms
+            if (now - lastProgressUpdate > 50) {
               const totalLoaded = collisionBytesLoaded + interactiveBytesLoaded;
               const percentLoaded = (totalLoaded / totalSize) * 100;
-              // Map 0-100% of download to 80-100% of loading bar
-              const progressPercent = 80 + (percentLoaded * 0.2);
-              setLoadProgress(Math.floor(progressPercent));
+              // Map 0-100% of download to 80-98% of loading bar (leave room for processing)
+              const progressPercent = 80 + (percentLoaded * 0.15); // Changed from 0.2 to 0.18
+              const cappedProgress = Math.min(Math.floor(progressPercent), 95); // Cap at 98%
+              setLoadProgress(cappedProgress);
               lastProgressUpdate = now;
             }
           };
@@ -768,6 +909,59 @@ function PlayCanvasMuseum() {
 
           window.floorMarkers = { hover: hoverMarker, destination: destinationMarker };
 
+          // NEW: Function to enter wall interaction mode
+          function enterWallMode(wallName, clickPoint) {
+            const wallDef = wallDefinitions[wallName];
+            if (!wallDef) return;
+
+            const camera = app.root.findByName('camera');
+            if (!camera) return;
+
+            console.log(`🎨 Entering wall mode: ${wallName}`);
+
+            // Get current mouse look values instead of camera euler (which might be flipped)
+            const currentMouseLook = window.getMouseLookValues ? window.getMouseLookValues() : { yaw: 0, pitch: 0 };
+
+            const previousCamera = {
+              position: camera.getPosition().clone(),
+              rotation: new pc.Vec3(currentMouseLook.pitch, currentMouseLook.yaw, 0) // Use mouse look values, not camera euler
+            };
+
+            const targetPosition = clickPoint.clone().add(
+              wallDef.normal.clone().mulScalar(wallDef.zoomDistance)
+            );
+
+            const lookDirection = wallDef.normal.clone();
+            const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
+            const targetPitch = 0;
+
+            window.wallTransitionState.isTransitioning = true;
+            window.wallTransitionState.startPosition = previousCamera.position.clone();
+            window.wallTransitionState.targetPosition = targetPosition;
+            window.wallTransitionState.startRotation = previousCamera.rotation.clone();
+            window.wallTransitionState.targetRotation = new pc.Vec3(targetPitch, targetYaw, 0);
+            window.wallTransitionState.progress = 0;
+            window.wallTransitionState.duration = 1.2;
+
+            window.wallPanState.isActive = true;
+            window.wallPanState.isDragging = false;
+            window.wallPanState.currentOffset = new pc.Vec3(0, 0, 0);
+            window.wallPanState.wallDefinition = wallDef;
+
+            setWallInteractionMode({
+              wallName: wallName,
+              clickPoint: clickPoint,
+              previousCamera: previousCamera
+            });
+            
+            // Store on window for update loop access
+            window.currentWallMode = {
+              wallName: wallName,
+              clickPoint: clickPoint,
+              previousCamera: previousCamera
+            };
+          }
+
           addMouseLook(app, camera, canvas);
           addWASDMovement(app, camera);
         });
@@ -874,7 +1068,7 @@ function PlayCanvasMuseum() {
           imageUrls={imageUrls}
         />
       )}
-      {isLoaded && (
+      {isLoaded && !wallInteractionMode && (
         <div style={{
           position: 'absolute',
           bottom: '20px',
@@ -929,6 +1123,50 @@ function PlayCanvasMuseum() {
           >
             →
           </button>
+        </div>
+      )}
+      
+      {/* NEW: Wall mode exit button */}
+      {wallInteractionMode && (
+        <button
+          onClick={exitWallMode}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            padding: '12px 24px',
+            background: 'rgba(244, 67, 54, 0.9)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '16px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: 999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+          }}
+        >
+          ← Exit Wall View (ESC)
+        </button>
+      )}
+
+      {/* NEW: Wall mode indicator */}
+      {wallInteractionMode && (
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          padding: '12px 24px',
+          background: 'rgba(33, 150, 243, 0.9)',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '16px',
+          fontWeight: 'bold',
+          zIndex: 999,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        }}>
+          Viewing: {wallInteractionMode.wallName} - Drag to explore
         </div>
       )}
     </div>
@@ -1003,6 +1241,43 @@ function addMouseLook(app, camera, canvas) {
     const deltaX = e.clientX - lastX;
     const deltaY = e.clientY - lastY;
     
+    // NEW: If in wall pan mode, handle panning instead of rotation
+    if (window.wallPanState && window.wallPanState.isActive) {
+      const wallDef = window.wallPanState.wallDefinition;
+      if (wallDef) {
+        const panSensitivity = 0.003;
+        
+        const normal = wallDef.normal;
+        const worldUp = new pc.Vec3(0, 1, 0);
+        const right = new pc.Vec3().cross(worldUp, normal).normalize();
+        const up = worldUp;
+        
+        const panX = -deltaX * panSensitivity;
+        const panY = deltaY * panSensitivity;
+        
+        const newOffset = window.wallPanState.currentOffset.clone();
+        newOffset.add(right.clone().mulScalar(panX));
+        newOffset.add(up.clone().mulScalar(panY));
+        
+        const maxPanX = wallDef.width / 2;
+        const maxPanY = wallDef.height / 2;
+        
+        const offsetRight = newOffset.dot(right);
+        const offsetUp = newOffset.dot(up);
+        
+        const clampedRight = Math.max(-maxPanX, Math.min(maxPanX, offsetRight));
+        const clampedUp = Math.max(-maxPanY, Math.min(maxPanY, offsetUp));
+        
+        window.wallPanState.currentOffset = right.clone().mulScalar(clampedRight)
+          .add(up.clone().mulScalar(clampedUp));
+      }
+      
+      lastX = e.clientX;
+      lastY = e.clientY;
+      return;
+    }
+    
+    // Normal mouse look rotation
     // Log on first move after lookAt
     if (Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0) {
       const currentEuler = camera.getEulerAngles();
@@ -1050,7 +1325,16 @@ function addWASDMovement(app, camera) {
   const keys = {};
   const moveSpeed = 3.0;
 
-  window.addEventListener('keydown', (e) => keys[e.code] = true);
+  window.addEventListener('keydown', (e) => {
+    keys[e.code] = true;
+    
+    // NEW: ESC to exit wall mode - check window.currentWallMode instead
+    if (e.key === 'Escape' && window.currentWallMode) {
+      // Trigger exit by clicking the exit button programmatically
+      // Or set a flag that exitWallMode checks
+      window.shouldExitWallMode = true;
+    }
+  });
   window.addEventListener('keyup', (e) => keys[e.code] = false);
 
   // Store movement state on window
@@ -1061,8 +1345,99 @@ function addWASDMovement(app, camera) {
     moveStartPosition: new pc.Vec3()
   };
 
+  window.wallTransitionState = {
+    isTransitioning: false,
+    startPosition: null,
+    targetPosition: null,
+    startRotation: null,
+    targetRotation: null,
+    progress: 0,
+    duration: 1.0
+  };
+
+  window.wallPanState = {
+    isActive: false,
+    isDragging: false,
+    lastMouseX: 0,
+    lastMouseY: 0,
+    currentOffset: new pc.Vec3(0, 0, 0),
+    wallDefinition: null
+  };
+
   app.on('update', (dt) => {
+    // Check for ESC exit request
+    if (window.shouldExitWallMode) {
+      window.shouldExitWallMode = false;
+      exitWallMode();
+    }
     const moveState = window.movementState;
+
+    // NEW: Handle wall transition
+    if (window.wallTransitionState && window.wallTransitionState.isTransitioning) {
+      const state = window.wallTransitionState;
+      state.progress += dt / state.duration;
+
+        if (state.progress >= 1.0) {
+          console.log('🎬 Wall transition completing!');
+          console.log('  Target position:', state.targetPosition);
+          console.log('  Target rotation (euler):', state.targetRotation);
+          
+          camera.setPosition(state.targetPosition);
+          camera.setEulerAngles(state.targetRotation);
+          
+          console.log('  Camera after setEulerAngles:', camera.getEulerAngles());
+          
+          state.isTransitioning = false;
+          
+          // Directly sync to target rotation - don't use reset which recalculates
+          if (window.syncMouseLookValues) {
+            console.log('  Syncing mouse look to:', state.targetRotation.y, state.targetRotation.x);
+            window.syncMouseLookValues(state.targetRotation.y, state.targetRotation.x);
+            const synced = window.getMouseLookValues();
+            console.log('  After sync, mouse look values are:', synced);
+          }
+        state.isTransitioning = false;
+        // Don't return - fall through to wall pan mode
+        } else {
+          const t = state.progress;
+          const smoothT = t * t * (3 - 2 * t);
+
+          // Interpolate position
+          const pos = new pc.Vec3().lerp(state.startPosition, state.targetPosition, smoothT);
+          camera.setPosition(pos);
+
+          // Convert Euler to Quaternions and use SLERP for rotation
+          const startQuat = new pc.Quat();
+          startQuat.setFromEulerAngles(state.startRotation.x, state.startRotation.y, state.startRotation.z);
+          
+          const targetQuat = new pc.Quat();
+          targetQuat.setFromEulerAngles(state.targetRotation.x, state.targetRotation.y, state.targetRotation.z);
+          
+          const currentQuat = new pc.Quat();
+          currentQuat.slerp(startQuat, targetQuat, smoothT);
+          camera.setRotation(currentQuat);
+          
+          return; // ONLY return while still transitioning
+        }
+    }
+
+    // NEW: Handle wall pan mode
+    if (window.wallPanState && window.wallPanState.isActive) {
+      const wallDef = window.wallPanState.wallDefinition;
+      if (wallDef && window.currentWallMode) {
+        const basePosition = window.currentWallMode.clickPoint.clone().add(
+          wallDef.normal.clone().mulScalar(wallDef.zoomDistance)
+        );
+
+        const finalPosition = basePosition.clone().add(window.wallPanState.currentOffset);
+        camera.setPosition(finalPosition);
+
+        const lookDirection = wallDef.normal.clone();
+        const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
+        camera.setEulerAngles(0, targetYaw, 0);
+      }
+      return;
+    }
 
     // // Handle camera viewpoint transition with quaternions
     // if (window.cameraTransition && window.cameraTransition.isTransitioning) {
