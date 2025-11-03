@@ -10,14 +10,19 @@ function PlayCanvasMuseum() {
   const [loadProgress, setLoadProgress] = useState(0);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [isInteractiveMode, setIsInteractiveMode] = useState(false);
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0); 
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
   const [viewpoints] = useState([
-    { name: "Personal", position: [-4, 1.5, 0], rotation: [0, 0, 0] },
-    { name: "Family Table", position: [-1, 1.5, 0], rotation: [-25, -90, 0] },
-    { name: "Dodgers", position: [-7, 1.5, 2], rotation: [10, 180, 0] },
-    { name: "Politics", position: [-5.5, 1.5, 0.20], rotation: [7, 90, 0] }
+    { name: "Personal", position: [-2, 1.5, 5.75], rotation: [0, 90, 0] },
+    { name: "Family Table", position: [0, 1.5, 2.5], rotation: [-25, 0, 0] },
+    { name: "Dodgers", position: [3, 1.5, 9], rotation: [10, -90, 0] },
+    { name: "Politics", position: [0.20, 1.5, 7], rotation: [7, 180, 0] }
+  ]);
+  const [lookAtPoints] = useState([
+    { name: "Personal Wall", position: new pc.Vec3(-6.5, 2.5, 5.75) },
+    { name: "Family Table", position: new pc.Vec3(0, 1, 1) },
+    { name: "Dodgers Wall", position: new pc.Vec3(7, 2.5, 9) },
+    { name: "Politics Wall", position: new pc.Vec3(0, 2.5, 12) }
   ]);
 
   const setViewpoint = (viewpointIndex) => {
@@ -26,33 +31,35 @@ function PlayCanvasMuseum() {
       if (camera) {
         const viewpoint = viewpoints[viewpointIndex];
         
-        // Store the transition state
-        if (!window.cameraTransition) {
-          window.cameraTransition = {
-            isTransitioning: false,
-            startPosition: new pc.Vec3(),
-            startRotation: new pc.Quat(),
-            targetPosition: new pc.Vec3(),
-            targetRotation: new pc.Quat(),
-            startTime: 0,
-            duration: 1500 // 1.5 second transition
-          };
-        }
-
-        const transition = window.cameraTransition;
-        transition.startPosition.copy(camera.getPosition());
-        transition.startRotation.copy(camera.getRotation()); // Get quaternion instead of euler
-        transition.targetPosition.set(...viewpoint.position);
+        // Get current values from mouse look
+        const startValues = window.getMouseLookValues ? window.getMouseLookValues() : { yaw: 0, pitch: 0 };
         
-        // Convert euler angles to quaternion for target
-        transition.targetRotation.setFromEulerAngles(...viewpoint.rotation);
-        
-        transition.startTime = Date.now();
-        transition.isTransitioning = true;
+        // Use the same system as click-to-move
+        window.movementState.targetPosition = new pc.Vec3(...viewpoint.position);
+        window.movementState.startYaw = startValues.yaw;
+        window.movementState.startPitch = startValues.pitch;
+        window.movementState.targetYaw = viewpoint.rotation[1]; // Y rotation is yaw
+        window.movementState.targetPitch = viewpoint.rotation[0]; // X rotation is pitch
+        window.movementState.isMoving = true;
         
         setCurrentViewpointIndex(viewpointIndex);
       }
     }
+  };
+
+  const findClosestLookAtPoint = (cameraPosition) => {
+    let closestPoint = lookAtPoints[0];
+    let minDistance = Infinity;
+
+    lookAtPoints.forEach(point => {
+      const distance = cameraPosition.distance(point.position);
+      if (distance < minDistance) {
+        minDistance = distance;
+        closestPoint = point;
+      }
+    });
+
+    return closestPoint;
   };
 
   // --- Handle window resize ---
@@ -141,8 +148,9 @@ function PlayCanvasMuseum() {
       farClip: 1000,
       fov: 70
     });
-    camera.setPosition(-4, 1.5, 0);
-    camera.setEulerAngles(0, 0, 0);
+    camera.camera.requestSceneColorMap(true);
+    camera.setPosition(0, 1.5, 5.75);
+    camera.setEulerAngles(0, 90, 0);
     app.root.addChild(camera);
 
     // Initialize scene layers to prevent splitLights error
@@ -160,7 +168,7 @@ function PlayCanvasMuseum() {
     // app.root.addChild(ambientLight);
 
     console.log('Loading splat...');
-    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/Splat8.sog";
+    const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/SplatFinal.sog";
 
     // Track download progress with XHR
     const xhr = new XMLHttpRequest();
@@ -170,18 +178,18 @@ function PlayCanvasMuseum() {
     xhr.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = (event.loaded / event.total) * 100;
-        setLoadProgress(percentComplete);
-        console.log('Download progress:', Math.round(percentComplete) + '%');
+        console.log(`Download progress: ${percentComplete.toFixed(1)}%`);
+        // Splat takes 0-70% of the loading bar
+        setLoadProgress(Math.floor(percentComplete * 0.7));
       } else {
-        // If we can't track, show indeterminate progress
-        setLoadProgress(prev => Math.min(prev + 5, 90));
+        setLoadProgress(prev => Math.min(prev + 5, 65));
       }
     };
 
     xhr.onload = () => {
       if (xhr.status === 200) {
         console.log('Download complete, processing...');
-        setLoadProgress(95);
+        setLoadProgress(75); // Splat done, now 75%
         
         // Create blob URL from the downloaded data
         const blob = new Blob([xhr.response]);
@@ -195,19 +203,33 @@ function PlayCanvasMuseum() {
 
         asset.on('load', () => {
           console.log('Splat loaded! Adding to running scene...');
-          setLoadProgress(100);
+          setLoadProgress(80);
           
           const splatEntity = new pc.Entity('splat');
           splatEntity.addComponent('gsplat', { asset: asset.id });
-          splatEntity.setPosition(0, 0, 0);
-          splatEntity.setLocalScale(1.2, 1.2, 1.2);
-          splatEntity.setEulerAngles(180, 0, 0);
+          splatEntity.setPosition(3.1903, -0.18828, 2.7212);
+          splatEntity.setLocalScale(1.329, 1.329, 1.329);
+          splatEntity.setEulerAngles(181.246, 135.72, 1.25);
           app.root.addChild(splatEntity);
 
-          // === LOAD COLLISION MESH ===
+          // === LOAD BOTH COLLISION AND INTERACTIVE MESH IN PARALLEL ===
           console.log('Loading collision mesh...');
-          const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube.glb";
+          const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube_v2.glb";
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
+
+          console.log('Loading interactive mesh...');
+          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v2.glb";
+          const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
+
+          let collisionLoaded = false;
+          let interactiveLoaded = false;
+
+          const checkBothLoaded = () => {
+            if (collisionLoaded && interactiveLoaded) {
+              console.log('Both meshes loaded! Showing scene...');
+              setIsLoaded(true);
+            }
+          };
 
           collisionAsset.on('load', () => {
             console.log('Collision mesh loaded!');
@@ -224,17 +246,17 @@ function PlayCanvasMuseum() {
               if (collisionEntity.model?.meshInstances) {
                 collisionEntity.model.meshInstances.forEach((mi) => {
                   mi.visible = false;
-                  mi.cull = false; // DISABLE CULLING - render always
+                  mi.cull = false;
                   mi.castShadow = false;
                   mi.receiveShadow = false;
                   
                   const material = new pc.StandardMaterial();
-                  material.emissive = new pc.Color(0, 1, 0); // Green
+                  material.emissive = new pc.Color(0, 1, 0);
                   material.emissiveIntensity = 1.0;
-                  material.opacity = 0.3; // 30% opacity (0.0 = invisible, 1.0 = solid)
-                  material.blendType = pc.BLEND_NORMAL; // Enable transparency
+                  material.opacity = 0.3;
+                  material.blendType = pc.BLEND_NORMAL;
                   material.useLighting = false;
-                  material.depthWrite = false; // Important for transparency
+                  material.depthWrite = false;
                   material.cull = pc.CULLFACE_NONE;
                   material.update();
                   
@@ -247,68 +269,60 @@ function PlayCanvasMuseum() {
               console.log('Entity layers:', collisionEntity.model.layers);
             }, 100);
 
-            collisionEntity.setPosition(-8.5, 0, .5);
-            collisionEntity.setLocalScale(0.8, 1, 0.8);
-            collisionEntity.setEulerAngles(0, 90, 0);
+            collisionEntity.setPosition(0, 0, 0);
+            collisionEntity.setLocalScale(1, 1, 1);
+            collisionEntity.setEulerAngles(0, 0, 0);
 
             app.root.addChild(collisionEntity);
             console.log('Collision entity position:', collisionEntity.getPosition());
 
             window.collisionMesh = collisionEntity;
+            
+            collisionLoaded = true;
+            checkBothLoaded();
           });
-
-          // === LOAD INTERACTIVE MESH (with proper lighting) ===
-          console.log('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room.glb";
-          const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
           interactiveAsset.on('load', () => {
             console.log('Interactive mesh loaded!');
             
-            // For container assets, instantiate the resource
             const interactiveEntity = interactiveAsset.resource.instantiateModelEntity();
             
-            // Use your collision box positioning as starting point
-            interactiveEntity.setPosition(1.35, 0, 0);
+            interactiveEntity.setPosition(0, 0, 0);
             interactiveEntity.setLocalScale(1, 1, 1);
-            interactiveEntity.setEulerAngles(0, 270, 0);
-
-            // Make the mesh invisible
-            setTimeout(() => {
-              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                interactiveEntity.model.meshInstances.forEach((mi) => {
-                  mi.visible = false;
-                });
-              }
-            }, 100);
+            interactiveEntity.setEulerAngles(0, 0, 0);
 
             app.root.addChild(interactiveEntity);
             console.log('Interactive mesh added at:', interactiveEntity.getPosition());
             
+            // Make the mesh invisible immediately
+            if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+              interactiveEntity.model.meshInstances.forEach((mi) => {
+                mi.visible = false;
+              });
+            }
+            
             // Log all the child objects so we can see what's labeled
-            setTimeout(() => {
-              console.log('=== Interactive mesh structure ===');
+            console.log('=== Interactive mesh structure ===');
+            
+            // Check the parent entity
+            if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+              console.log(`Parent has ${interactiveEntity.model.meshInstances.length} mesh instances:`);
+              interactiveEntity.model.meshInstances.forEach((mi, i) => {
+                console.log(`  [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
+              });
+            }
+            
+            // Check children
+            interactiveEntity.children.forEach((child, index) => {
+              console.log(`Child ${index}: ${child.name}`);
               
-              // Check the parent entity
-              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                console.log(`Parent has ${interactiveEntity.model.meshInstances.length} mesh instances:`);
-                interactiveEntity.model.meshInstances.forEach((mi, i) => {
-                  console.log(`  [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
+              if (child.model && child.model.meshInstances) {
+                console.log(`  Child has ${child.model.meshInstances.length} mesh instances:`);
+                child.model.meshInstances.forEach((mi, i) => {
+                  console.log(`    [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
                 });
               }
-              
-              // Check children
-              interactiveEntity.children.forEach((child, index) => {
-                console.log(`Child ${index}: ${child.name}`);
-                
-                if (child.model && child.model.meshInstances) {
-                  console.log(`  Child has ${child.model.meshInstances.length} mesh instances:`);
-                  child.model.meshInstances.forEach((mi, i) => {
-                    console.log(`    [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
-                  });
-                }
-              });
-            }, 500);
+            });
 
             // Store reference for click detection
             window.interactiveMesh = interactiveEntity;
@@ -421,12 +435,59 @@ function PlayCanvasMuseum() {
                       
                       // Set the target at camera height (1.5)
                       const targetPos = new pc.Vec3(intersectionPoint.x, 1.5, intersectionPoint.z);
+
+                      // Find the closest look-at point for this target position
+                      const closestLookAt = findClosestLookAtPoint(targetPos);
+
+                      console.log('🎯 Camera will look at:', closestLookAt.name, 'at position:', closestLookAt.position);
+                      console.log('📍 Camera moving to:', targetPos);
+
+                      // Calculate rotation to look at the closest point
+                      const lookAtQuat = new pc.Quat();
+                      const lookDirection = new pc.Vec3();
+                      lookDirection.sub2(closestLookAt.position, targetPos).normalize();
+
+                      // Check if looking straight up or down (gimbal lock territory)
+                      const upDot = Math.abs(lookDirection.dot(pc.Vec3.UP));
+                      if (upDot > 0.99) {
+                        const tempUp = Math.abs(lookDirection.x) < 0.9 ? pc.Vec3.RIGHT : pc.Vec3.FORWARD;
+                        const tempMat = new pc.Mat4();
+                        tempMat.setLookAt(closestLookAt.position, targetPos, tempUp);
+                        lookAtQuat.setFromMat4(tempMat);
+                      } else {
+                        const tempMat = new pc.Mat4();
+                        tempMat.setLookAt(closestLookAt.position, targetPos, pc.Vec3.UP);
+                        lookAtQuat.setFromMat4(tempMat);
+                      }
+
+                      // IMPORTANT: Normalize the quaternion to avoid flipped euler angles
+                      // Extract and rebuild from yaw/pitch to get clean representation
+                      const forward = new pc.Vec3();
+                      lookAtQuat.transformVector(pc.Vec3.FORWARD, forward);
+
+                      const targetYaw = Math.atan2(forward.x, forward.z) * pc.math.RAD_TO_DEG;
+                      const horizontalDist = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
+                      const targetPitch = Math.atan2(-forward.y, horizontalDist) * pc.math.RAD_TO_DEG;
+
+                      console.log('🎯 Target yaw/pitch for animation:', targetPitch, targetYaw);
+                      console.log('🎯 Forward vector:', forward.x, forward.y, forward.z);
+                      console.log('🎯 LookAt position:', closestLookAt.position.x, closestLookAt.position.y, closestLookAt.position.z);
+                      console.log('🎯 Camera target position:', targetPos.x, targetPos.y, targetPos.z);
+
+                      // Get current yaw/pitch from the mouse look system
+                      const startValues = window.getMouseLookValues ? window.getMouseLookValues() : { yaw: 0, pitch: 0 };
+
+                      // Store both position and rotation targets
                       window.movementState.targetPosition = targetPos;
+                      window.movementState.targetYaw = targetYaw;
+                      window.movementState.targetPitch = targetPitch;
+                      window.movementState.startYaw = startValues.yaw;
+                      window.movementState.startPitch = startValues.pitch;
                       window.movementState.isMoving = true;
                       
                       // Show destination marker and hide hover marker
                       if (window.floorMarkers) {
-                        window.floorMarkers.destination.setPosition(intersectionPoint.x, 0.005, intersectionPoint.z);
+                        window.floorMarkers.destination.setPosition(intersectionPoint.x, 0.05, intersectionPoint.z);
                         window.floorMarkers.destination.enabled = true;
                         window.floorMarkers.hover.enabled = false;
                       }
@@ -538,7 +599,7 @@ function PlayCanvasMuseum() {
                       
                       // Show and position hover marker
                       if (window.floorMarkers) {
-                        window.floorMarkers.hover.setPosition(intersectionPoint.x, 0.005, intersectionPoint.z);
+                        window.floorMarkers.hover.setPosition(intersectionPoint.x, 0.05, intersectionPoint.z);
                         window.floorMarkers.hover.enabled = true;
                       }
                     }
@@ -559,19 +620,52 @@ function PlayCanvasMuseum() {
               }
             });
 
+            interactiveLoaded = true;
+            checkBothLoaded();
           });
           interactiveAsset.on('error', (err) => console.error('Error loading interactive mesh:', err));
+                    
+          collisionAsset.on('error', (err) => console.error('Error loading collision mesh:', err));
+
+          // File sizes in bytes
+          const collisionSize = 2200;
+          const interactiveSize = 232605328;
+          const totalSize = collisionSize + interactiveSize;
+          
+          let collisionBytesLoaded = 0;
+          let interactiveBytesLoaded = 0;
+          let lastProgressUpdate = 0;
+
+          const updateCombinedProgress = () => {
+            const now = Date.now();
+            if (now - lastProgressUpdate > 50) { // Throttle to every 50ms
+              const totalLoaded = collisionBytesLoaded + interactiveBytesLoaded;
+              const percentLoaded = (totalLoaded / totalSize) * 100;
+              // Map 0-100% of download to 80-100% of loading bar
+              const progressPercent = 80 + (percentLoaded * 0.2);
+              setLoadProgress(Math.floor(progressPercent));
+              lastProgressUpdate = now;
+            }
+          };
+
+          collisionAsset.on('progress', (bytesLoaded) => {
+            collisionBytesLoaded = Math.min(bytesLoaded, collisionSize);
+            updateCombinedProgress();
+          });
+
+          interactiveAsset.on('progress', (bytesLoaded) => {
+            interactiveBytesLoaded = Math.min(bytesLoaded, interactiveSize);
+            updateCombinedProgress();
+          });
+
+          // Add and load assets ONLY ONCE
+          app.assets.add(collisionAsset);
+          app.assets.load(collisionAsset);
           app.assets.add(interactiveAsset);
           app.assets.load(interactiveAsset);
 
-          collisionAsset.on('error', (err) => console.error('Error loading collision mesh:', err));
-          app.assets.add(collisionAsset);
-          app.assets.load(collisionAsset);
-
           // Clean up blob URL
           setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-
-          setIsLoaded(true);
 
           // Helper function to create a ring mesh
           function createRingMesh(innerRadius, outerRadius, segments) {
@@ -839,33 +933,52 @@ function addMouseLook(app, camera, canvas) {
   let lastY = 0;
   let accumulatedYaw = 0;
   let accumulatedPitch = 0;
-  
+
+  // Helper to get current accumulated values
+  window.getMouseLookValues = () => {
+    return { yaw: accumulatedYaw, pitch: accumulatedPitch };
+  };
+    
   // Initialize from camera's starting rotation
   const initialEuler = camera.getEulerAngles();
   accumulatedYaw = initialEuler.y;
   accumulatedPitch = initialEuler.x;
   
-  // Expose a way to reset these when camera transitions happen
-  window.resetMouseLookTracking = () => {
-    const currentEuler = camera.getEulerAngles();
-    let pitch = currentEuler.x;
-    let yaw = currentEuler.y;
-    
-    // Normalize ONLY if we're in the flipped state (near 180 degrees yaw with extreme pitch)
-    if (pitch < -90 && Math.abs(Math.abs(currentEuler.z) - 180) < 1) {
-      // We're flipped - normalize it
-      pitch = pitch + 180;
-      yaw = yaw + 180;
-      
-      // Normalize yaw to -180 to 180
-      while (yaw > 180) yaw -= 360;
-      while (yaw < -180) yaw += 360;
-      
-      console.log('Normalized after transition:', pitch, yaw);
-    }
-    
+  // Helper to sync accumulated values without calling resetMouseLookTracking
+  window.syncMouseLookValues = (yaw, pitch) => {
     accumulatedYaw = yaw;
     accumulatedPitch = pitch;
+    console.log('Synced mouse look to:', pitch, yaw);
+  };
+
+  // Expose a way to reset these when camera transitions happen
+  window.resetMouseLookTracking = () => {
+    const quat = camera.getRotation();
+    
+    // Extract yaw and pitch from quaternion
+    const forward = new pc.Vec3();
+    quat.transformVector(pc.Vec3.FORWARD, forward);
+    
+    // Calculate yaw (rotation around Y axis)
+    accumulatedYaw = Math.atan2(forward.x, forward.z) * pc.math.RAD_TO_DEG;
+    
+    // Calculate pitch (rotation around X axis)
+    const horizontalDist = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
+    accumulatedPitch = Math.atan2(-forward.y, horizontalDist) * pc.math.RAD_TO_DEG;
+    
+    // Clamp pitch
+    accumulatedPitch = Math.max(-85, Math.min(85, accumulatedPitch));
+    
+    console.log('Reset tracking to:', accumulatedPitch, accumulatedYaw);
+    
+    // IMPORTANT: Immediately apply these values to normalize the camera rotation
+    // This prevents the "snap" on first mouse move
+    const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, accumulatedYaw);
+    const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, accumulatedPitch);
+    const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
+    camera.setRotation(finalQuat);
+    
+    console.log('Normalized camera to:', camera.getEulerAngles().x, camera.getEulerAngles().y);
   };
   
   canvas.addEventListener('mousedown', (e) => {
@@ -881,6 +994,15 @@ function addMouseLook(app, camera, canvas) {
     const deltaX = e.clientX - lastX;
     const deltaY = e.clientY - lastY;
     
+    // Log on first move after lookAt
+    if (Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0) {
+      const currentEuler = camera.getEulerAngles();
+      console.log('🖱️ First mouse move after lookAt:');
+      console.log('   Current camera euler:', currentEuler.x, currentEuler.y, currentEuler.z);
+      console.log('   Accumulated values:', accumulatedPitch, accumulatedYaw);
+      console.log('   Delta:', deltaX, deltaY);
+    }
+    
     // Update accumulated values
     accumulatedYaw += deltaX * 0.1;
     accumulatedPitch += deltaY * 0.1;
@@ -888,12 +1010,17 @@ function addMouseLook(app, camera, canvas) {
     // Clamp pitch only
     accumulatedPitch = Math.max(-85, Math.min(85, accumulatedPitch));
     
+    console.log('   New accumulated:', accumulatedPitch, accumulatedYaw);
+    
     // Build rotation: yaw around world UP, pitch around local RIGHT
     const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, accumulatedYaw);
     const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, accumulatedPitch);
     const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
     
     camera.setRotation(finalQuat);
+    
+    const afterEuler = camera.getEulerAngles();
+    console.log('   After setRotation euler:', afterEuler.x, afterEuler.y, afterEuler.z);
     
     lastX = e.clientX;
     lastY = e.clientY;
@@ -928,40 +1055,40 @@ function addWASDMovement(app, camera) {
   app.on('update', (dt) => {
     const moveState = window.movementState;
 
-    // Handle camera viewpoint transition with quaternions
-    if (window.cameraTransition && window.cameraTransition.isTransitioning) {
-      const transition = window.cameraTransition;
-      const elapsed = Date.now() - transition.startTime;
-      const progress = Math.min(elapsed / transition.duration, 1);
+    // // Handle camera viewpoint transition with quaternions
+    // if (window.cameraTransition && window.cameraTransition.isTransitioning) {
+    //   const transition = window.cameraTransition;
+    //   const elapsed = Date.now() - transition.startTime;
+    //   const progress = Math.min(elapsed / transition.duration, 1);
       
-      // Ease in-out function for smoother motion
-      const easeProgress = progress < 0.5 
-        ? 2 * progress * progress 
-        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+    //   // Ease in-out function for smoother motion
+    //   const easeProgress = progress < 0.5 
+    //     ? 2 * progress * progress 
+    //     : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-      // Interpolate position
-      camera.setPosition(
-        transition.startPosition.x + (transition.targetPosition.x - transition.startPosition.x) * easeProgress,
-        transition.startPosition.y + (transition.targetPosition.y - transition.startPosition.y) * easeProgress,
-        transition.startPosition.z + (transition.targetPosition.z - transition.startPosition.z) * easeProgress
-      );
+    //   // Interpolate position
+    //   camera.setPosition(
+    //     transition.startPosition.x + (transition.targetPosition.x - transition.startPosition.x) * easeProgress,
+    //     transition.startPosition.y + (transition.targetPosition.y - transition.startPosition.y) * easeProgress,
+    //     transition.startPosition.z + (transition.targetPosition.z - transition.startPosition.z) * easeProgress
+    //   );
 
-      // Slerp (spherical interpolation) for smooth rotation without gimbal lock
-      const tempQuat = new pc.Quat();
-      tempQuat.slerp(transition.startRotation, transition.targetRotation, easeProgress);
-      camera.setRotation(tempQuat);
+    //   // Slerp (spherical interpolation) for smooth rotation without gimbal lock
+    //   const tempQuat = new pc.Quat();
+    //   tempQuat.slerp(transition.startRotation, transition.targetRotation, easeProgress);
+    //   camera.setRotation(tempQuat);
       
-      // Update mouse look rotation to match final euler angles
-      if (progress >= 1) {
-        transition.isTransitioning = false;
-        // Reset the accumulated tracking values
-        if (window.resetMouseLookTracking) {
-          window.resetMouseLookTracking();
-        }
-      }
+    //   // Update mouse look rotation to match final euler angles
+    //   if (progress >= 1) {
+    //     transition.isTransitioning = false;
+    //     // Reset the accumulated tracking values
+    //     if (window.resetMouseLookTracking) {
+    //       window.resetMouseLookTracking();
+    //     }
+    //   }
       
-      return; // Don't process other movement during transition
-    }
+    //   return; // Don't process other movement during transition
+    // }
 
     // Handle click-to-move
     if (moveState.isMoving && moveState.targetPosition) {
@@ -977,16 +1104,52 @@ function addWASDMovement(app, camera) {
         ? 2 * progress * progress 
         : 1 - Math.pow(-2 * progress + 2, 2) / 2;
 
+      // Interpolate position
       camera.setPosition(
         moveState.moveStartPosition.x + (moveState.targetPosition.x - moveState.moveStartPosition.x) * easeProgress,
         1.5,
         moveState.moveStartPosition.z + (moveState.targetPosition.z - moveState.moveStartPosition.z) * easeProgress
       );
 
+      // Interpolate rotation using yaw/pitch instead of quaternion slerp
+      if (moveState.targetYaw !== undefined && moveState.targetPitch !== undefined) {
+        // Calculate shortest yaw difference (handle wraparound at +/-180)
+        let yawDiff = moveState.targetYaw - moveState.startYaw;
+        
+        // Normalize to -180 to 180 range
+        while (yawDiff > 180) yawDiff -= 360;
+        while (yawDiff < -180) yawDiff += 360;
+        
+        const currentYaw = moveState.startYaw + yawDiff * easeProgress;
+        const currentPitch = moveState.startPitch + (moveState.targetPitch - moveState.startPitch) * easeProgress;
+        
+        const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, currentYaw);
+        const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, currentPitch);
+        const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
+        camera.setRotation(finalQuat);
+      }
+
       if (progress >= 1) {
         moveState.moveStartTime = 0;
         moveState.isMoving = false;
         moveState.targetPosition = null;
+        
+        // DON'T call resetMouseLookTracking - set values directly
+        // The camera is already at the correct rotation from the interpolation
+        // Just sync the accumulated tracking values
+        const finalForward = new pc.Vec3();
+        camera.getRotation().transformVector(pc.Vec3.FORWARD, finalForward);
+        
+        // Calculate and store in the mouse look closure variables
+        // We need to access them through window
+        if (window.syncMouseLookValues) {
+          window.syncMouseLookValues(moveState.targetYaw, moveState.targetPitch);
+        }
+        
+        moveState.targetYaw = undefined;
+        moveState.targetPitch = undefined;
+        moveState.startYaw = undefined;
+        moveState.startPitch = undefined;
 
         // Hide destination marker
         if (window.floorMarkers) {
