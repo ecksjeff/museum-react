@@ -442,6 +442,15 @@ function PlayCanvasMuseum() {
                       console.log('🎯 Camera will look at:', closestLookAt.name, 'at position:', closestLookAt.position);
                       console.log('📍 Camera moving to:', targetPos);
 
+                      // Update UI immediately to show which viewpoint we're looking at
+                      const lookAtToViewpointMap = {
+                        "Personal Wall": 0,
+                        "Family Table": 1,
+                        "Dodgers Wall": 2,
+                        "Politics Wall": 3
+                      };
+                      setCurrentViewpointIndex(lookAtToViewpointMap[closestLookAt.name]);
+
                       // Calculate rotation to look at the closest point
                       const lookAtQuat = new pc.Quat();
                       const lookDirection = new pc.Vec3();

@@ -20,6 +20,8 @@
 *.blend
 *.ply
 *.sog
+*.glb
+*.gltf
 
 # Keep .glb files if they're essential and not too large
 # *.glb
