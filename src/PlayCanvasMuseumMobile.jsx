@@ -211,17 +211,17 @@ function PlayCanvasMuseumMobile() {
 					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
 					console.log('Loading interactive mesh...');
-					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v2.glb";
+					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v3.glb";
 					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
 					let collisionLoaded = false;
 					let interactiveLoaded = false;
 
 					const checkBothLoaded = () => {
-						// if (collisionLoaded && interactiveLoaded) {
-						// 	console.log('Both meshes loaded! Showing scene...');
-						// 	setIsLoaded(true);
-						// }
+						if (collisionLoaded && interactiveLoaded) {
+							console.log('Both meshes loaded! Showing scene...');
+							setIsLoaded(true);
+						}
 						if (collisionLoaded) {
 							console.log('Collision loaded! Showing scene...');
 							setIsLoaded(true);
@@ -376,7 +376,7 @@ function PlayCanvasMuseumMobile() {
 
 					// File sizes in bytes
 					const collisionSize = 2200;
-					const interactiveSize = 232605328;
+					const interactiveSize = 5423572;
 					const totalSize = collisionSize + interactiveSize;
 
 					let collisionBytesLoaded = 0;
@@ -410,8 +410,8 @@ function PlayCanvasMuseumMobile() {
 					app.assets.load(collisionAsset);
 
 					interactiveAsset.on('error', (err) => console.error('Error loading interactive mesh:', err));
-					// app.assets.add(interactiveAsset);
-					// app.assets.load(interactiveAsset);
+					app.assets.add(interactiveAsset);
+					app.assets.load(interactiveAsset);
 
 					// Clean up blob URL
 					setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);

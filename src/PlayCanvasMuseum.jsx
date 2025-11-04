@@ -14,10 +14,10 @@ function PlayCanvasMuseum() {
   const [imageUrls, setImageUrls] = useState({});
   const [wallInteractionMode, setWallInteractionMode] = useState(null);
   const [viewpoints] = useState([
-    { name: "Personal", position: [-2, 1.5, 5.75], rotation: [0, 90, 0] },
-    { name: "Family Table", position: [0, 1.5, 2.5], rotation: [-25, 0, 0] },
-    { name: "Dodgers", position: [3, 1.5, 9], rotation: [10, -90, 0] },
-    { name: "Politics", position: [0.20, 1.5, 7], rotation: [7, 180, 0] }
+    { name: "Personal", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
+    { name: "Family Table", position: [0, 2, 3], rotation: [-25, 0, 0] },
+    { name: "Dodgers", position: [3, 2, 9], rotation: [10, -90, 0] },
+    { name: "Politics", position: [0.20, 2, 7], rotation: [7, 180, 0] }
   ]);
   const [lookAtPoints] = useState([
     { name: "Personal Wall", position: new pc.Vec3(-6.5, 2.5, 5.75) },
@@ -27,26 +27,26 @@ function PlayCanvasMuseum() {
   ]);
 
   const [wallDefinitions] = useState({
-    'Personal Wall': {
+    'Personal Photos': {
       normal: new pc.Vec3(1, 0, 0),
       center: new pc.Vec3(-6.5, 2.5, 5.75),
       width: 8,
       height: 3,
-      zoomDistance: 1.5
+      zoomDistance: 2.5
     },
-    'Dodgers Wall': {
+    'Dodgers Photos': {
       normal: new pc.Vec3(-1, 0, 0),
       center: new pc.Vec3(7, 2.5, 9),
       width: 3,
       height: 2.2,
-      zoomDistance: 1.5
+      zoomDistance: 2.5
     },
-    'Politics Wall': {
+    'Politics Photos': {
       normal: new pc.Vec3(0, 0, -1),
       center: new pc.Vec3(0, 2.5, 12),
       width: 4.3,
       height: 2.2,
-      zoomDistance: 1.5
+      zoomDistance: 2.5
     }
   });
 
@@ -198,7 +198,7 @@ function PlayCanvasMuseum() {
       fov: 70
     });
     camera.camera.requestSceneColorMap(true);
-    camera.setPosition(0, 1.5, 5.75);
+    camera.setPosition(0, 2, 5.75);
     camera.setEulerAngles(0, 90, 0);
     app.root.addChild(camera);
 
@@ -267,7 +267,7 @@ function PlayCanvasMuseum() {
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
           console.log('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v2.glb";
+          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v3.glb";
           const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
           let collisionLoaded = false;
@@ -491,11 +491,11 @@ function PlayCanvasMuseum() {
                   // Determine which wall based on material name or position
                   let wallName = null;
                   if (clickedWall.name.toLowerCase().includes('personal') || clickedWall.hitPoint.x < -3) {
-                    wallName = 'Personal Wall';
+                    wallName = 'Personal Photos';
                   } else if (clickedWall.name.toLowerCase().includes('dodger') || clickedWall.hitPoint.x > 3) {
-                    wallName = 'Dodgers Wall';
+                    wallName = 'Dodgers Photos';
                   } else if (clickedWall.name.toLowerCase().includes('politic') || clickedWall.hitPoint.z > 10) {
-                    wallName = 'Politics Wall';
+                    wallName = 'Politics Photos';
                   }
                   
                   if (wallName) {
@@ -574,7 +574,7 @@ function PlayCanvasMuseum() {
                       console.log('Floor clicked at:', intersectionPoint);
                       
                       // Set the target at camera height (1.5)
-                      const targetPos = new pc.Vec3(intersectionPoint.x, 1.5, intersectionPoint.z);
+                      const targetPos = new pc.Vec3(intersectionPoint.x, 2, intersectionPoint.z);
 
                       // Find the closest look-at point for this target position
                       const closestLookAt = findClosestLookAtPoint(targetPos);
@@ -778,7 +778,7 @@ function PlayCanvasMuseum() {
 
           // File sizes in bytes
           const collisionSize = 2200;
-          const interactiveSize = 232605328;
+          const interactiveSize = 5423572;
           const totalSize = collisionSize + interactiveSize;
 
           let collisionBytesLoaded = 0;
@@ -1507,7 +1507,7 @@ function addWASDMovement(app, camera) {
       // Interpolate position
       camera.setPosition(
         moveState.moveStartPosition.x + (moveState.targetPosition.x - moveState.moveStartPosition.x) * easeProgress,
-        1.5,
+        2,
         moveState.moveStartPosition.z + (moveState.targetPosition.z - moveState.moveStartPosition.z) * easeProgress
       );
 
@@ -1592,16 +1592,16 @@ function addWASDMovement(app, camera) {
       
       if (aabb) {
         if (aabb.containsPoint(newPos)) {
-          newPos.y = 1.5;
+          newPos.y = 2;
           camera.setPosition(newPos);
         } else {
-          const slideX = new pc.Vec3(newPos.x, 1.5, currentPos.z);
+          const slideX = new pc.Vec3(newPos.x, 2, currentPos.z);
           if (aabb.containsPoint(slideX)) {
             camera.setPosition(slideX);
             return;
           }
           
-          const slideZ = new pc.Vec3(currentPos.x, 1.5, newPos.z);
+          const slideZ = new pc.Vec3(currentPos.x, 2, newPos.z);
           if (aabb.containsPoint(slideZ)) {
             camera.setPosition(slideZ);
             return;
