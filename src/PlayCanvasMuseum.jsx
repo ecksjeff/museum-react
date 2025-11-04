@@ -412,7 +412,7 @@ function PlayCanvasMuseum() {
               }
 
               // NEW: Check if in wall mode - ignore clicks (for future picture interaction)
-              if (wallInteractionMode) {
+              if (window.currentWallMode) {
                 return;
               }
 
