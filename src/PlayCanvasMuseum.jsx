@@ -30,22 +30,22 @@ function PlayCanvasMuseum() {
     'Personal Wall': {
       normal: new pc.Vec3(1, 0, 0),
       center: new pc.Vec3(-6.5, 2.5, 5.75),
-      width: 5.5,
+      width: 8,
       height: 3,
       zoomDistance: 1.5
     },
     'Dodgers Wall': {
       normal: new pc.Vec3(-1, 0, 0),
       center: new pc.Vec3(7, 2.5, 9),
-      width: 4,
-      height: 3,
+      width: 3,
+      height: 2.2,
       zoomDistance: 1.5
     },
     'Politics Wall': {
       normal: new pc.Vec3(0, 0, -1),
       center: new pc.Vec3(0, 2.5, 12),
-      width: 5,
-      height: 3,
+      width: 4.3,
+      height: 2.2,
       zoomDistance: 1.5
     }
   });
@@ -927,9 +927,23 @@ function PlayCanvasMuseum() {
               rotation: new pc.Vec3(currentMouseLook.pitch, currentMouseLook.yaw, 0) // Use mouse look values, not camera euler
             };
 
-            const targetPosition = clickPoint.clone().add(
+            // Calculate wall vectors first
+            const normal = wallDef.normal;
+            const worldUp = new pc.Vec3(0, 1, 0);
+            const right = new pc.Vec3().cross(worldUp, normal).normalize();
+            const up = worldUp;
+
+            // Calculate initial offset from wall center to click point
+            const wallCenter = wallDef.center.clone();
+            const clickOffset = clickPoint.clone().sub(wallCenter);
+            const initialOffsetRight = clickOffset.dot(right);
+            const initialOffsetUp = clickOffset.dot(up);
+
+            // Position camera at wall center plus the initial offset
+            const targetPosition = wallDef.center.clone().add(
               wallDef.normal.clone().mulScalar(wallDef.zoomDistance)
-            );
+            ).add(right.clone().mulScalar(initialOffsetRight))
+            .add(up.clone().mulScalar(initialOffsetUp));
 
             const lookDirection = wallDef.normal.clone();
             const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
@@ -945,7 +959,8 @@ function PlayCanvasMuseum() {
 
             window.wallPanState.isActive = true;
             window.wallPanState.isDragging = false;
-            window.wallPanState.currentOffset = new pc.Vec3(0, 0, 0);
+            window.wallPanState.currentOffset = right.clone().mulScalar(initialOffsetRight)
+              .add(up.clone().mulScalar(initialOffsetUp));
             window.wallPanState.wallDefinition = wallDef;
 
             setWallInteractionMode({
@@ -1425,7 +1440,8 @@ function addWASDMovement(app, camera) {
     if (window.wallPanState && window.wallPanState.isActive) {
       const wallDef = window.wallPanState.wallDefinition;
       if (wallDef && window.currentWallMode) {
-        const basePosition = window.currentWallMode.clickPoint.clone().add(
+        // Base position is always wall center
+        const basePosition = wallDef.center.clone().add(
           wallDef.normal.clone().mulScalar(wallDef.zoomDistance)
         );
 
