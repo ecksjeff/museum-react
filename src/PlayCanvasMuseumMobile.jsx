@@ -770,12 +770,12 @@ function PlayCanvasMuseumMobile() {
 					}}
 					style={{
 						position: 'absolute',
-						top: '15px',
+						top: '60px',
 						right: '15px',
 						width: '45px',
 						height: '45px',
 						borderRadius: '50%',
-						background: 'rgba(0,0,0,0.6)',
+						background: 'rgba(255, 0, 0, 0.6)',
 						color: '#fff',
 						fontSize: '24px',
 						border: 'none',
@@ -808,7 +808,7 @@ function addTouchControls(app, camera, canvas) {
   });
 
   canvas.addEventListener('touchmove', (e) => {
-		// ✅ Pan camera while in wall mode
+		// Pan camera while in wall mode
 		if (window.wallPanState?.isActive) {
 			const touch = e.touches[0];
 			const deltaX = touch.clientX - window.wallPanState.lastTouchX;
@@ -889,14 +889,14 @@ function addTouchControls(app, camera, canvas) {
 				camera.setPosition(s.targetPosition);
 				camera.setEulerAngles(s.targetRotation);
 
-				// ✅ If we JUST finished exiting wall mode: clean up properly
+				// If we JUST finished exiting wall mode: clean up properly
 				if (!window.currentWallMode) {
 					window.wallPanState = null;
 					if (typeof setWallInteractionMode === 'function') {
 						setWallInteractionMode(null);
 					}
 				} else {
-					// ✅ If still in wall mode, allow panning
+					// If still in wall mode, allow panning
 					if (window.wallPanState) window.wallPanState.isActive = true;
 				}
 
