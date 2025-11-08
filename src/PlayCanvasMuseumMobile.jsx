@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
-import { familyPhotos, documentaryVideo } from './familyPhotosData';
+import { familyPhotos, documentaryVideo } from './photoData';
 
 function PlayCanvasMuseumMobile() {
   const canvasRef = useRef(null);
@@ -14,14 +14,14 @@ function PlayCanvasMuseumMobile() {
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
 	const [viewpoints] = useState([
-		{ name: "Personal", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
+		{ name: "Politics", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
 		{ name: "Family Table", position: [0, 2, 4.5], rotation: [0, 0, 0] },
 		{ name: "Dodgers", position: [3, 2, 9.25], rotation: [0, -90, 0] },
-		{ name: "Politics", position: [0.20, 2, 7], rotation: [0, 180, 0] }
+		{ name: "Personal", position: [0.20, 2, 7], rotation: [0, 180, 0] }
 	]);
 	const [wallInteractionMode, setWallInteractionMode] = useState(null);
 	const [wallDefinitions] = useState({
-		'Personal Photos': {
+		'Politics Photos': {
 			normal: new pc.Vec3(1, 0, 0),
 			center: new pc.Vec3(-6.5, 2.5, 5.75),
 			width: 8,
@@ -35,7 +35,7 @@ function PlayCanvasMuseumMobile() {
 			height: 2.2,
 			zoomDistance: 2.5
 		},
-		'Politics Photos': {
+		'Personal Photos': {
 			normal: new pc.Vec3(0, 0, -1),
 			center: new pc.Vec3(0, 2.5, 12),
 			width: 4.3,
@@ -235,7 +235,7 @@ function PlayCanvasMuseumMobile() {
 					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
 					console.log('Loading interactive mesh...');
-					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v3.glb";
+					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v4.glb";
 					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
 					let collisionLoaded = false;
@@ -487,9 +487,9 @@ function PlayCanvasMuseumMobile() {
 											);
 
 											let wallName = null;
-											if (hitPoint.x < -3) wallName = 'Personal Photos';
+											if (hitPoint.x < -3) wallName = 'Politics Photos';
 											else if (hitPoint.x > 3) wallName = 'Dodgers Photos';
-											else if (hitPoint.z > 10) wallName = 'Politics Photos';
+											else if (hitPoint.z > 10) wallName = 'Personal Photos';
 
 											if (wallName) clickedWall = { wallName, hitPoint };
 										}

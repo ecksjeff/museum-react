@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
-import { familyPhotos, documentaryVideo } from './familyPhotosData';
+import { familyPhotos, politicsPhotos, documentaryVideo, personalPhotos, dodgersPhotos } from './photoData';
 
 function PlayCanvasMuseum() {
   const canvasRef = useRef(null);
@@ -13,26 +13,35 @@ function PlayCanvasMuseum() {
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
   const [wallInteractionMode, setWallInteractionMode] = useState(null);
+  const [wallPhotoMode, setWallPhotoMode] = useState(null);
   const [viewpoints] = useState([
-    { name: "Personal", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
+    { name: "Politics", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
     { name: "Family Table", position: [0, 2, 3], rotation: [-25, 0, 0] },
     { name: "Dodgers", position: [3, 2, 9], rotation: [10, -90, 0] },
-    { name: "Politics", position: [0.20, 2, 7], rotation: [7, 180, 0] }
+    { name: "Personal", position: [0.20, 2, 7], rotation: [7, 180, 0] }
   ]);
   const [lookAtPoints] = useState([
-    { name: "Personal Wall", position: new pc.Vec3(-6.5, 2.5, 5.75) },
+    { name: "Politics Wall", position: new pc.Vec3(-6.5, 2.5, 5.75) },
     { name: "Family Table", position: new pc.Vec3(0, 1, 1) },
     { name: "Dodgers Wall", position: new pc.Vec3(7, 2.5, 9) },
-    { name: "Politics Wall", position: new pc.Vec3(0, 2.5, 12) }
+    { name: "Personal Wall", position: new pc.Vec3(0, 2.5, 12) }
   ]);
 
   const [wallDefinitions] = useState({
-    'Personal Photos': {
+    'Politics Photos': {
       normal: new pc.Vec3(1, 0, 0),
       center: new pc.Vec3(-6.5, 2.5, 5.75),
       width: 8,
       height: 3,
       zoomDistance: 2.5
+    },
+    'Family Photos': {
+      normal: new pc.Vec3(0, 0.5, -0.5).normalize(), // flipped Y (upward tilt)
+      center: new pc.Vec3(0, 1.5, 3.0),
+      width: 0,
+      height: 0,
+      zoomDistance: 0.5,
+      pitch: -35
     },
     'Dodgers Photos': {
       normal: new pc.Vec3(-1, 0, 0),
@@ -41,7 +50,7 @@ function PlayCanvasMuseum() {
       height: 2.2,
       zoomDistance: 2.5
     },
-    'Politics Photos': {
+    'Personal Photos': {
       normal: new pc.Vec3(0, 0, -1),
       center: new pc.Vec3(0, 2.5, 12),
       width: 4.3,
@@ -125,14 +134,15 @@ function PlayCanvasMuseum() {
     return () => window.removeEventListener('resize', updateSize);
   }, []);
 
-  // --- Preload and cache all family photos ---
+  // --- Preload and cache all photos (family and politics) ---
   useEffect(() => {
     console.log('Preloading and creating object URLs...');
     
     const urlMap = {};
+    const allPhotos = [...familyPhotos, ...politicsPhotos, ...personalPhotos, ...dodgersPhotos];
     let loadedCount = 0;
     
-    const promises = familyPhotos.map((photo) => {
+    const promises = allPhotos.map((photo) => {
       return fetch(photo.src)
         .then(response => response.blob())
         .then(blob => {
@@ -140,7 +150,7 @@ function PlayCanvasMuseum() {
           const objectUrl = URL.createObjectURL(blob);
           urlMap[photo.src] = objectUrl;
           loadedCount++;
-          console.log(`✓ Created object URL ${loadedCount}/${familyPhotos.length}`);
+          console.log(`✓ Created object URL ${loadedCount}/${allPhotos.length}`);
           return objectUrl;
         })
         .catch(err => {
@@ -267,7 +277,7 @@ function PlayCanvasMuseum() {
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
           console.log('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v3.glb";
+          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v4.glb";
           const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
           let collisionLoaded = false;
@@ -411,8 +421,143 @@ function PlayCanvasMuseum() {
                 return;
               }
 
-              // NEW: Check if in wall mode - ignore clicks (for future picture interaction)
+              // NEW: Check if in wall mode - handle photo clicks
               if (window.currentWallMode) {
+                console.log('🖼️ In wall mode, checking for photo clicks...');
+                console.log('Current wall mode:', window.currentWallMode);
+                const camera = app.root.findByName('camera');
+                if (!camera) return;
+                
+                const cameraComponent = camera.camera;
+                const x = event.clientX;
+                const y = event.clientY;
+                const cameraPos = camera.getPosition();
+                const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
+                const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+                
+                // Check for photo mesh clicks
+                if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                  let closestPhotoDistance = Infinity;
+                  let clickedPhoto = null;
+                  
+                  interactiveEntity.model.meshInstances.forEach((mi) => {
+                    const materialName = mi.material.name;
+                    
+                    // Look for material names that are numbers (photo meshes)
+                    // Skip if it contains letters other than material prefixes
+                    const meshNumber = materialName.match(/(\d+)/)?.[1];
+                    if (!meshNumber) return;
+                    
+                    // Do AABB ray intersection
+                    const aabb = mi.aabb;
+                    const min = aabb.getMin();
+                    const max = aabb.getMax();
+
+                    let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                    let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+                    let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                    let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+                    if (tmin > tymax || tymin > tmax) return;
+
+                    tmin = Math.max(tmin, tymin);
+                    tmax = Math.min(tmax, tymax);
+
+                    let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                    let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+                    if (tmin > tzmax || tzmin > tmax) return;
+
+                    tmin = Math.max(tmin, tzmin);
+
+                    if (tmin > 0 && tmin < closestPhotoDistance) {
+                      closestPhotoDistance = tmin;
+                      clickedPhoto = { meshId: materialName, materialName: materialName };
+                      console.log(`  ✓ Photo HIT! Mesh: ${meshNumber}, Material: ${materialName}`);
+                    }
+                  });
+                  
+                  if (clickedPhoto) {
+                    console.log(`Found clicked photo:`, clickedPhoto);
+                    console.log(`Checking if wall mode matches...`);
+                    
+                    if (window.currentWallMode.wallName === 'Politics Photos') {
+                      console.log(`Opening slideshow for Politics wall, starting at mesh ${clickedPhoto.meshId}`);
+                      console.log(`Politics photos array:`, politicsPhotos);
+                      
+                      // Find the index of the clicked photo in politicsPhotos array
+                      const photoIndex = politicsPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
+                      console.log(`Photo index found:`, photoIndex);
+                      
+                      if (photoIndex !== -1) {
+                        console.log(`Setting wallPhotoMode state...`);
+                        setWallPhotoMode({
+                          wallName: 'Politics Photos',
+                          startIndex: photoIndex
+                        });
+                      } else {
+                        console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in politicsPhotos array`);
+                        console.log(`Available mesh IDs:`, politicsPhotos.map(p => p.meshId));
+                      }
+                    } else if (window.currentWallMode.wallName === 'Personal Photos') {
+                      console.log(`Opening slideshow for Personal wall, starting at mesh ${clickedPhoto.meshId}`);
+                      console.log(`Personal photos array:`, personalPhotos);
+                      
+                      // Find the index of the clicked photo in personalPhotos array
+                      const photoIndex = personalPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
+                      console.log(`Photo index found:`, photoIndex);
+                      
+                      if (photoIndex !== -1) {
+                        console.log(`Setting wallPhotoMode state...`);
+                        setWallPhotoMode({
+                          wallName: 'Personal Photos',
+                          startIndex: photoIndex
+                        });
+                      } else {
+                        console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in personalPhotos array`);
+                        console.log(`Available mesh IDs:`, personalPhotos.map(p => p.meshId));
+                      }
+                    } else if (window.currentWallMode.wallName === 'Dodgers Photos') {
+                      console.log(`Opening slideshow for Dodgers wall, starting at mesh ${clickedPhoto.meshId}`);
+                      console.log(`Dodgers photos array:`, dodgersPhotos);
+                      
+                      // Find the index of the clicked photo in dodgersPhotos array
+                      const photoIndex = dodgersPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
+                      console.log(`Photo index found:`, photoIndex);
+                      
+                      if (photoIndex !== -1) {
+                        console.log(`Setting wallPhotoMode state...`);
+                        setWallPhotoMode({
+                          wallName: 'Dodgers Photos',
+                          startIndex: photoIndex
+                        });
+                      } else {
+                        console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in dodgersPhotos array`);
+                        console.log(`Available mesh IDs:`, dodgersPhotos.map(p => p.meshId));
+                      }
+                    } else if (window.currentWallMode.wallName === 'Family Photos') {
+                      console.log(`Opening slideshow for Family Photos, starting at mesh ${clickedPhoto.meshId}`);
+                      const photoIndex = familyPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
+                      console.log(`Photo index found:`, photoIndex);
+                      
+                      if (photoIndex !== -1) {
+                        console.log(`Setting wallPhotoMode state...`);
+                        setWallPhotoMode({
+                          wallName: 'Family Photos',
+                          startIndex: photoIndex
+                        });
+                      } else {
+                        console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in familyPhotos array`);
+                      }
+                    }
+                  } else {
+                    console.log(`No photo clicked`);
+                  }
+                }
                 return;
               }
 
@@ -430,7 +575,55 @@ function PlayCanvasMuseum() {
               const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
               const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
               
-              // NEW: First check for wall clicks using AABB intersection
+              // FIRST: Check for table clicks (most specific)
+              let clickedTable = null;
+              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                let closestDistance = Infinity;
+                
+                interactiveEntity.model.meshInstances.forEach((mi, index) => {
+                  const materialName = mi.material.name;
+                  
+                  if (materialName.includes('table')) {
+                    const aabb = mi.aabb;
+                    const min = aabb.getMin();
+                    const max = aabb.getMax();
+                    
+                    let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                    let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+                    
+                    let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                    let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+                    
+                    if (tmin > tymax || tymin > tmax) return;
+                    
+                    tmin = Math.max(tmin, tymin);
+                    tmax = Math.min(tmax, tymax);
+                    
+                    let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                    let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+                    
+                    if (tmin > tzmax || tzmin > tmax) return;
+                    
+                    tmin = Math.max(tmin, tzmin);
+                    
+                    if (tmin > 0 && tmin < closestDistance) {
+                      closestDistance = tmin;
+                      clickedTable = { name: materialName, index: index };
+                    }
+                  }
+                });
+                
+                if (clickedTable) {
+                  console.log(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
+                  enterWallMode('Family Photos', new pc.Vec3(0, 1.5, 1));  // Enter wall mode instead
+                  return;
+                }
+              }
+              
+              // SECOND: Check for wall clicks using AABB intersection
               console.log('🖱️ Click detected, checking for walls...');
               let clickedWall = null;
               if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
@@ -475,7 +668,7 @@ function PlayCanvasMuseum() {
                     );
                     
                     // Skip table materials
-                    if (materialName.includes('table') || materialName.includes('chair')) {
+                    if (materialName.includes('table') || materialName.includes('accent') || materialName.includes('fireplace')) {
                       return;
                     }
                     
@@ -491,11 +684,11 @@ function PlayCanvasMuseum() {
                   // Determine which wall based on material name or position
                   let wallName = null;
                   if (clickedWall.name.toLowerCase().includes('personal') || clickedWall.hitPoint.x < -3) {
-                    wallName = 'Personal Photos';
+                    wallName = 'Politics Photos';
                   } else if (clickedWall.name.toLowerCase().includes('dodger') || clickedWall.hitPoint.x > 3) {
                     wallName = 'Dodgers Photos';
                   } else if (clickedWall.name.toLowerCase().includes('politic') || clickedWall.hitPoint.z > 10) {
-                    wallName = 'Politics Photos';
+                    wallName = 'Personal Photos';
                   }
                   
                   if (wallName) {
@@ -505,55 +698,7 @@ function PlayCanvasMuseum() {
                 }
               }
               
-              // First check for table clicks
-              let clickedTable = null;
-              if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                let closestDistance = Infinity;
-                
-                interactiveEntity.model.meshInstances.forEach((mi, index) => {
-                  const materialName = mi.material.name;
-                  
-                  if (materialName.includes('pasted__tableSG')) {
-                    const aabb = mi.aabb;
-                    const min = aabb.getMin();
-                    const max = aabb.getMax();
-                    
-                    let tmin = (min.x - cameraPos.x) / rayDirection.x;
-                    let tmax = (max.x - cameraPos.x) / rayDirection.x;
-                    if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
-                    
-                    let tymin = (min.y - cameraPos.y) / rayDirection.y;
-                    let tymax = (max.y - cameraPos.y) / rayDirection.y;
-                    if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
-                    
-                    if (tmin > tymax || tymin > tmax) return;
-                    
-                    tmin = Math.max(tmin, tymin);
-                    tmax = Math.min(tmax, tymax);
-                    
-                    let tzmin = (min.z - cameraPos.z) / rayDirection.z;
-                    let tzmax = (max.z - cameraPos.z) / rayDirection.z;
-                    if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
-                    
-                    if (tmin > tzmax || tzmin > tmax) return;
-                    
-                    tmin = Math.max(tmin, tzmin);
-                    
-                    if (tmin > 0 && tmin < closestDistance) {
-                      closestDistance = tmin;
-                      clickedTable = { name: materialName, index: index };
-                    }
-                  }
-                });
-                
-                if (clickedTable) {
-                  console.log(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
-                  setIsInteractiveMode(true);
-                  return; // Don't process floor click
-                }
-              }
-              
-              // If no table clicked, check for floor click using collision box bounds
+              // If no table or wall clicked, check for floor click using collision box bounds
               if (window.collisionMesh && window.collisionMesh.model) {
                 const aabb = window.collisionMesh.model.meshInstances[0]?.aabb;
                 if (aabb) {
@@ -584,10 +729,10 @@ function PlayCanvasMuseum() {
 
                       // Update UI immediately to show which viewpoint we're looking at
                       const lookAtToViewpointMap = {
-                        "Personal Wall": 0,
+                        "Politics Wall": 0,
                         "Family Table": 1,
                         "Dodgers Wall": 2,
-                        "Politics Wall": 3
+                        "Personal Wall": 3
                       };
                       setCurrentViewpointIndex(lookAtToViewpointMap[closestLookAt.name]);
 
@@ -946,8 +1091,13 @@ function PlayCanvasMuseum() {
             .add(up.clone().mulScalar(initialOffsetUp));
 
             const lookDirection = wallDef.normal.clone();
-            const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
-            const targetPitch = 0;
+            let targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
+            const targetPitch = wallDef.pitch || 0;
+
+            if (wallName === 'Family Photos') {
+              targetYaw += 180;
+              if (targetYaw >= 360) targetYaw -= 360; // normalize right away
+            }
 
             window.wallTransitionState.isTransitioning = true;
             window.wallTransitionState.startPosition = previousCamera.position.clone();
@@ -1076,11 +1226,22 @@ function PlayCanvasMuseum() {
           <div>Status: ✓ Loaded</div>
         </div>
       )}
-      {isInteractiveMode && (
-        <InteractiveOverlay 
-          visible={isInteractiveMode} 
-          onClose={() => setIsInteractiveMode(false)}
+      {(isInteractiveMode || wallPhotoMode) && (
+        <PhotoSlideshow
+          photos={wallPhotoMode ? (
+            wallPhotoMode.wallName === 'Politics Photos' ? politicsPhotos :
+            wallPhotoMode.wallName === 'Family Photos' ? familyPhotos :
+            wallPhotoMode.wallName === 'Dodgers Photos' ? dodgersPhotos :
+            wallPhotoMode.wallName === 'Personal Photos' ? personalPhotos :
+            []
+          ) : familyPhotos}
+          startIndex={wallPhotoMode?.startIndex || 0}
+          onClose={() => {
+            setIsInteractiveMode(false);
+            setWallPhotoMode(null);
+          }}
           imageUrls={imageUrls}
+          title={wallPhotoMode?.wallName || "Roz Wyman Family Collection"}
         />
       )}
       {isLoaded && !wallInteractionMode && (
@@ -1406,6 +1567,9 @@ function addWASDMovement(app, camera) {
           
           // Directly sync to target rotation - don't use reset which recalculates
           if (window.syncMouseLookValues) {
+            // Normalize yaw to within 0–360 range, but avoid 360 because it wraps to 0
+            let normalizedYaw = state.targetRotation.y % 360;
+            if (normalizedYaw > 180) normalizedYaw -= 360; // keep within -180..180 range
             console.log('  Syncing mouse look to:', state.targetRotation.y, state.targetRotation.x);
             window.syncMouseLookValues(state.targetRotation.y, state.targetRotation.x);
             const synced = window.getMouseLookValues();
@@ -1440,7 +1604,6 @@ function addWASDMovement(app, camera) {
     if (window.wallPanState && window.wallPanState.isActive) {
       const wallDef = window.wallPanState.wallDefinition;
       if (wallDef && window.currentWallMode) {
-        // Base position is always wall center
         const basePosition = wallDef.center.clone().add(
           wallDef.normal.clone().mulScalar(wallDef.zoomDistance)
         );
@@ -1449,8 +1612,16 @@ function addWASDMovement(app, camera) {
         camera.setPosition(finalPosition);
 
         const lookDirection = wallDef.normal.clone();
-        const targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
-        camera.setEulerAngles(0, targetYaw, 0);
+        let targetYaw = Math.atan2(lookDirection.x, lookDirection.z) * pc.math.RAD_TO_DEG;
+
+        // Keep the Family Table facing direction consistent
+        if (window.currentWallMode?.wallName === 'Family Photos') {
+          targetYaw += 180;
+          if (targetYaw >= 360) targetYaw -= 360;
+        }
+
+        camera.setEulerAngles(wallDef.pitch || 0, targetYaw, 0);
+
       }
       return;
     }
@@ -1612,28 +1783,20 @@ function addWASDMovement(app, camera) {
   });
 }
 
-// Interactive overlay component
-function InteractiveOverlay({ visible, onClose, imageUrls }) {
-  const [currentView, setCurrentView] = useState('selection'); // 'selection', 'photos', 'video'
-  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
-
-  if (!visible) return null;
-
-  const openPhotoAlbum = () => setCurrentView('photos');
-  const openDocumentary = () => setCurrentView('video');
-  const backToSelection = () => setCurrentView('selection');
+// Unified Photo Slideshow component
+function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
+  const [currentPhotoIndex, setCurrentPhotoIndex] = useState(startIndex);
 
   const nextPhoto = () => {
-    if (currentPhotoIndex < familyPhotos.length - 1) {
-      setCurrentPhotoIndex(currentPhotoIndex + 1);
-    }
+    setCurrentPhotoIndex((currentPhotoIndex + 1) % photos.length);
   };
 
   const previousPhoto = () => {
-    if (currentPhotoIndex > 0) {
-      setCurrentPhotoIndex(currentPhotoIndex - 1);
-    }
+    setCurrentPhotoIndex((currentPhotoIndex - 1 + photos.length) % photos.length);
   };
+
+  const currentPhoto = photos[currentPhotoIndex];
+  const displaySrc = imageUrls[currentPhoto.src] || currentPhoto.src;
 
   return (
     <div style={{
@@ -1642,207 +1805,114 @@ function InteractiveOverlay({ visible, onClose, imageUrls }) {
       left: 0,
       width: '100vw',
       height: '100vh',
-      background: 'rgba(0, 0, 0, 0.8)',
+      background: 'rgba(0, 0, 0, 0.9)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1000
     }}>
-      {currentView === 'selection' && (
-        <div style={{
-          background: 'white',
-          borderRadius: '15px',
-          padding: '30px',
-          maxWidth: '500px',
-          width: '90%',
-          textAlign: 'center',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
-          position: 'relative'
+      <div style={{
+        background: 'white',
+        borderRadius: '15px',
+        padding: '20px',
+        maxWidth: '90vw',
+        width: '90%',
+        height: '90vh',
+        overflow: 'visible',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative'
+      }}>
+        <button 
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '20px',
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '35px',
+            height: '35px',
+            cursor: 'pointer',
+            fontSize: '18px',
+            zIndex: 1001
+          }}
+        >
+          ×
+        </button>
+        
+        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
+            {title}
+          </h3>
+          
+          <img 
+            src={displaySrc}
+            alt={currentPhoto.caption || `Photo ${currentPhotoIndex + 1}`}
+            style={{
+              maxWidth: '100%',
+              maxHeight: '60vh',
+              objectFit: 'contain',
+              borderRadius: '10px',
+              boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+              margin: '0 auto'
+            }}
+          />
+          
+          <div style={{ margin: '15px 0', color: '#666' }}>
+            <span style={{ fontWeight: 'bold' }}>
+              {currentPhotoIndex + 1} of {photos.length}
+            </span>
+            {currentPhoto.caption && (
+              <p style={{ marginTop: '10px', fontSize: '14px' }}>
+                {currentPhoto.caption}
+              </p>
+            )}
+          </div>
+        </div>
+        
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          position: 'absolute', 
+          bottom: '20px', 
+          left: '20px', 
+          right: '20px' 
         }}>
           <button 
-            onClick={onClose}
+            onClick={previousPhoto}
             style={{
-              position: 'absolute',
-              top: '15px',
-              right: '20px',
-              background: '#f44336',
-              color: 'white',
-              border: 'none',
-              borderRadius: '50%',
-              width: '35px',
-              height: '35px',
-              cursor: 'pointer',
-              fontSize: '18px'
-            }}
-          >
-            ×
-          </button>
-          <h2 style={{ marginTop: 0, color: '#333', fontSize: '24px' }}>
-            Roz Wyman Family Collection
-          </h2>
-          <p>Choose what you'd like to explore:</p>
-          <button 
-            onClick={openPhotoAlbum}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '15px 20px',
-              margin: '15px 0',
-              background: '#4CAF50',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '16px',
-              cursor: 'pointer'
-            }}
-          >
-            View Family Photo Album
-          </button>
-          <button 
-            onClick={openDocumentary}
-            style={{
-              display: 'block',
-              width: '100%',
-              padding: '15px 20px',
-              margin: '15px 0',
               background: '#2196F3',
               color: 'white',
               border: 'none',
               borderRadius: '8px',
-              fontSize: '16px',
-              cursor: 'pointer'
+              padding: '10px 20px',
+              cursor: 'pointer',
+              fontSize: '14px'
             }}
           >
-            Watch Family Documentary
+            ← Previous
           </button>
-        </div>
-      )}
 
-      {currentView === 'photos' && (
-        <div style={{
-          background: 'white',
-          borderRadius: '15px',
-          padding: '20px',
-          maxWidth: '800px',
-          width: '90%',
-          maxHeight: '90vh',
-          overflow: 'hidden',
-          position: 'relative'
-        }}>
           <button 
-            onClick={backToSelection}
+            onClick={nextPhoto}
             style={{
-              position: 'absolute',
-              top: '15px',
-              right: '20px',
-              background: '#f44336',
+              background: '#2196F3',
               color: 'white',
               border: 'none',
-              borderRadius: '50%',
-              width: '35px',
-              height: '35px',
+              borderRadius: '8px',
+              padding: '10px 20px',
               cursor: 'pointer',
-              fontSize: '18px'
+              fontSize: '14px'
             }}
           >
-            ×
+            Next →
           </button>
-          <div style={{ textAlign: 'center' }}>
-            <img 
-              src={imageUrls[familyPhotos[currentPhotoIndex].src] || familyPhotos[currentPhotoIndex].src}
-              alt="Family Photo"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '500px',
-                objectFit: 'contain',
-                borderRadius: '10px',
-                boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)'
-              }}
-            />
-            <div style={{ margin: '10px 0', color: '#666' }}>
-              <span>{currentPhotoIndex + 1} of {familyPhotos.length}</span>
-              <p>{familyPhotos[currentPhotoIndex].caption}</p>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px' }}>
-              <button 
-                onClick={previousPhoto}
-                disabled={currentPhotoIndex === 0}
-                style={{
-                  background: currentPhotoIndex === 0 ? '#ccc' : '#2196F3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  cursor: currentPhotoIndex === 0 ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                ← Previous
-              </button>
-              <button 
-                onClick={nextPhoto}
-                disabled={currentPhotoIndex === familyPhotos.length - 1}
-                style={{
-                  background: currentPhotoIndex === familyPhotos.length - 1 ? '#ccc' : '#2196F3',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '8px',
-                  padding: '10px 20px',
-                  cursor: currentPhotoIndex === familyPhotos.length - 1 ? 'not-allowed' : 'pointer',
-                  fontSize: '14px'
-                }}
-              >
-                Next →
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-
-      {currentView === 'video' && (
-        <div style={{
-          background: 'black',
-          borderRadius: '15px',
-          padding: '20px',
-          maxWidth: '900px',
-          width: '90%',
-          maxHeight: '90vh',
-          position: 'relative'
-        }}>
-          <button 
-            onClick={backToSelection}
-            style={{
-              position: 'absolute',
-              top: '15px',
-              right: '20px',
-              background: '#f44336',
-              color: 'white',
-              border: 'none',
-              borderRadius: '50%',
-              width: '35px',
-              height: '35px',
-              cursor: 'pointer',
-              fontSize: '18px',
-              zIndex: 1001
-            }}
-          >
-            ×
-          </button>
-          <video 
-            controls
-            style={{
-              width: '100%',
-              height: 'auto',
-              maxHeight: '70vh',
-              borderRadius: '10px'
-            }}
-          >
-            <source src={documentaryVideo.mp4} type="video/mp4" />
-            <source src={documentaryVideo.webm} type="video/webm" />
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
