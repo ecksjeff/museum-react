@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
-import { familyPhotos, politicsPhotos, documentaryVideo, personalPhotos, dodgersPhotos } from './photoData';
+import { familyPhotos, politicsPhotos, personalPhotos, dodgersPhotos } from './photoData';
 
 function PlayCanvasMuseum() {
   const canvasRef = useRef(null);
@@ -14,6 +14,7 @@ function PlayCanvasMuseum() {
   const [imageUrls, setImageUrls] = useState({});
   const [wallInteractionMode, setWallInteractionMode] = useState(null);
   const [wallPhotoMode, setWallPhotoMode] = useState(null);
+  const [isCameraMoving, setIsCameraMoving] = useState(false);
   const [viewpoints] = useState([
     { name: "Politics", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
     { name: "Family Table", position: [0, 2, 3], rotation: [-25, 0, 0] },
@@ -48,14 +49,14 @@ function PlayCanvasMuseum() {
       center: new pc.Vec3(7, 2.5, 9),
       width: 3,
       height: 2.2,
-      zoomDistance: 2.5
+      zoomDistance: 2
     },
     'Personal Photos': {
       normal: new pc.Vec3(0, 0, -1),
       center: new pc.Vec3(0, 2.5, 12),
       width: 4.3,
       height: 2.2,
-      zoomDistance: 2.5
+      zoomDistance: 2
     }
   });
 
@@ -277,7 +278,7 @@ function PlayCanvasMuseum() {
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
           console.log('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v4.glb";
+          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
           const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
           let collisionLoaded = false;
@@ -683,11 +684,11 @@ function PlayCanvasMuseum() {
                   
                   // Determine which wall based on material name or position
                   let wallName = null;
-                  if (clickedWall.name.toLowerCase().includes('personal') || clickedWall.hitPoint.x < -3) {
+                  if (clickedWall.name.toLowerCase().includes('politics') || clickedWall.hitPoint.x < -3) {
                     wallName = 'Politics Photos';
                   } else if (clickedWall.name.toLowerCase().includes('dodger') || clickedWall.hitPoint.x > 3) {
                     wallName = 'Dodgers Photos';
-                  } else if (clickedWall.name.toLowerCase().includes('politic') || clickedWall.hitPoint.z > 10) {
+                  } else if (clickedWall.name.toLowerCase().includes('personal') || clickedWall.hitPoint.z > 10) {
                     wallName = 'Personal Photos';
                   }
                   
@@ -798,7 +799,7 @@ function PlayCanvasMuseum() {
                 if (window.floorMarkers) {
                   window.floorMarkers.hover.enabled = false;
                 }
-                canvas.style.cursor = 'grab';
+                // canvas.style.cursor = 'grab';
                 return;
               }
 
@@ -871,7 +872,7 @@ function PlayCanvasMuseum() {
                 });
               }
               
-              // If not hovering table, check floor
+              // If not hovering table, check floor (but disable while in wall mode)
               if (!hoveredTable && window.collisionMesh && window.collisionMesh.model) {
                 const aabb = window.collisionMesh.model.meshInstances[0]?.aabb;
                 if (aabb) {
@@ -890,11 +891,69 @@ function PlayCanvasMuseum() {
                     if (intersectionPoint.x >= min.x && intersectionPoint.x <= max.x &&
                         intersectionPoint.z >= min.z && intersectionPoint.z <= max.z) {
                       hoveredFloor = true;
-                      
-                      // Show and position hover marker
+
+                      // ✅ Hide hover marker if we're in wall mode
                       if (window.floorMarkers) {
-                        window.floorMarkers.hover.setPosition(intersectionPoint.x, 0.05, intersectionPoint.z);
-                        window.floorMarkers.hover.enabled = true;
+                        if (window.currentWallMode) {
+                          window.floorMarkers.hover.enabled = false;
+                        } else {
+                          window.floorMarkers.hover.setPosition(intersectionPoint.x, 0.05, intersectionPoint.z);
+                          window.floorMarkers.hover.enabled = true;
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+
+              // If not hovering table or floor, check for wall or photo hover
+              if (!hoveredTable && !hoveredFloor && interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                const camera = app.root.findByName('camera');
+                if (camera) {
+                  const cameraComponent = camera.camera;
+                  const x = event.clientX;
+                  const y = event.clientY;
+                  const cameraPos = camera.getPosition();
+                  const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
+                  const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+
+                  for (const mi of interactiveEntity.model.meshInstances) {
+                    const matName = mi.material.name.toLowerCase();
+
+                    // Check if it's a wall or photo mesh (like your click detection logic)
+                    if (
+                      matName.includes('politic') ||
+                      matName.includes('personal') ||
+                      matName.includes('dodger') ||
+                      matName.match(/(\d+)/) // photo materials that are numbered
+                    ) {
+                      const aabb = mi.aabb;
+                      const min = aabb.getMin();
+                      const max = aabb.getMax();
+
+                      let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                      let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+                      let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                      let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                      if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+                      if (tmin > tymax || tymin > tmax) continue;
+
+                      tmin = Math.max(tmin, tymin);
+                      tmax = Math.min(tmax, tymax);
+
+                      let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                      let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                      if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+                      if (tmin > tzmax || tzmin > tmax) continue;
+
+                      tmin = Math.max(tmin, tzmin);
+                      if (tmin > 0) {
+                        hoveredTable = true; // treat like interactive
+                        break;
                       }
                     }
                   }
@@ -907,11 +966,12 @@ function PlayCanvasMuseum() {
               }
               
               // Change cursor based on hover
-              if (isMouseDown && isDragging) {
-                canvas.style.cursor = 'grabbing'; // Keep grabbing cursor while dragging
-              } else {
-                canvas.style.cursor = hoveredTable ? 'pointer' : (hoveredFloor ? 'pointer' : 'grab');
-              }
+              // if (isMouseDown && isDragging) {
+              //   canvas.style.cursor = 'grabbing'; // Keep grabbing cursor while dragging
+              // } else {
+              //   canvas.style.cursor = hoveredTable ? 'pointer' : (hoveredFloor ? 'pointer' : 'grab');
+              // }
+              window.isHoveringInteractive = hoveredTable || hoveredFloor;
             });
 
             interactiveLoaded = true;
@@ -1129,6 +1189,7 @@ function PlayCanvasMuseum() {
 
           addMouseLook(app, camera, canvas);
           addWASDMovement(app, camera);
+          window.setCameraMoving = setIsCameraMoving;
         });
 
         asset.on('error', (err) => console.error('Error loading splat:', err));
@@ -1221,9 +1282,10 @@ function PlayCanvasMuseum() {
           color: 'white', background: 'rgba(0, 0, 0, 0.7)',
           padding: '15px', borderRadius: '8px', fontSize: '14px', zIndex: 100
         }}>
-          <div><strong>PlayCanvas Test</strong></div>
+          <div><strong>Tips</strong></div>
           <div>Click & drag to look around</div>
-          <div>Status: ✓ Loaded</div>
+          <div>Click the floor to move</div>
+          <div>Click a photo to learn more</div>
         </div>
       )}
       {(isInteractiveMode || wallPhotoMode) && (
@@ -1259,6 +1321,7 @@ function PlayCanvasMuseum() {
           zIndex: 100
         }}>
           <button
+            disabled={isCameraMoving}
             onClick={() => setViewpoint((currentViewpointIndex - 1 + viewpoints.length) % viewpoints.length)}
             style={{
               padding: '8px 12px',
@@ -1285,6 +1348,7 @@ function PlayCanvasMuseum() {
           </div>
           
           <button
+            disabled={isCameraMoving}
             onClick={() => setViewpoint((currentViewpointIndex + 1) % viewpoints.length)}
             style={{
               padding: '8px 12px',
@@ -1322,7 +1386,7 @@ function PlayCanvasMuseum() {
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
           }}
         >
-          ← Exit Wall View (ESC)
+          ← Leave wall (ESC)
         </button>
       )}
 
@@ -1332,6 +1396,7 @@ function PlayCanvasMuseum() {
           position: 'absolute',
           top: '20px',
           left: '50%',
+          textAlign: 'center',
           transform: 'translateX(-50%)',
           padding: '12px 24px',
           background: 'rgba(33, 150, 243, 0.9)',
@@ -1342,7 +1407,8 @@ function PlayCanvasMuseum() {
           zIndex: 999,
           boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
         }}>
-          Viewing: {wallInteractionMode.wallName} - Drag to explore
+          Viewing: {wallInteractionMode.wallName}
+          <br />Click a photo to learn more!
         </div>
       )}
     </div>
@@ -1358,52 +1424,36 @@ function addMouseLook(app, camera, canvas) {
   let accumulatedPitch = 0;
 
   // Helper to get current accumulated values
-  window.getMouseLookValues = () => {
-    return { yaw: accumulatedYaw, pitch: accumulatedPitch };
-  };
-    
+  window.getMouseLookValues = () => ({ yaw: accumulatedYaw, pitch: accumulatedPitch });
+
   // Initialize from camera's starting rotation
   const initialEuler = camera.getEulerAngles();
   accumulatedYaw = initialEuler.y;
   accumulatedPitch = initialEuler.x;
-  
-  // Helper to sync accumulated values without calling resetMouseLookTracking
+
+  // Sync and reset helpers
   window.syncMouseLookValues = (yaw, pitch) => {
     accumulatedYaw = yaw;
     accumulatedPitch = pitch;
-    console.log('Synced mouse look to:', pitch, yaw);
   };
 
-  // Expose a way to reset these when camera transitions happen
   window.resetMouseLookTracking = () => {
     const quat = camera.getRotation();
-    
-    // Extract yaw and pitch from quaternion
     const forward = new pc.Vec3();
     quat.transformVector(pc.Vec3.FORWARD, forward);
-    
-    // Calculate yaw (rotation around Y axis)
     accumulatedYaw = Math.atan2(forward.x, forward.z) * pc.math.RAD_TO_DEG;
-    
-    // Calculate pitch (rotation around X axis)
-    const horizontalDist = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
-    accumulatedPitch = Math.atan2(-forward.y, horizontalDist) * pc.math.RAD_TO_DEG;
-    
-    // Clamp pitch
+    const horizDist = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
+    accumulatedPitch = Math.atan2(-forward.y, horizDist) * pc.math.RAD_TO_DEG;
     accumulatedPitch = Math.max(-85, Math.min(85, accumulatedPitch));
-    
-    console.log('Reset tracking to:', accumulatedPitch, accumulatedYaw);
-    
-    // IMPORTANT: Immediately apply these values to normalize the camera rotation
-    // This prevents the "snap" on first mouse move
+
     const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, accumulatedYaw);
     const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, accumulatedPitch);
     const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
     camera.setRotation(finalQuat);
-    
-    console.log('Normalized camera to:', camera.getEulerAngles().x, camera.getEulerAngles().y);
   };
-  
+
+  // ---- Mouse Handlers ----
+
   canvas.addEventListener('mousedown', (e) => {
     isDragging = true;
     lastX = e.clientX;
@@ -1412,87 +1462,78 @@ function addMouseLook(app, camera, canvas) {
   });
 
   canvas.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    
     const deltaX = e.clientX - lastX;
     const deltaY = e.clientY - lastY;
-    
-    // NEW: If in wall pan mode, handle panning instead of rotation
+
+    if (!isDragging) {
+      // Update hover cursor based on global hover flag
+      if (window.isHoveringInteractive) canvas.style.cursor = 'pointer';
+      else canvas.style.cursor = 'grab';
+      return;
+    }
+
+    // --- Handle Wall Panning ---
     if (window.wallPanState && window.wallPanState.isActive) {
       const wallDef = window.wallPanState.wallDefinition;
       if (wallDef) {
         const panSensitivity = 0.003;
-        
         const normal = wallDef.normal;
         const worldUp = new pc.Vec3(0, 1, 0);
         const right = new pc.Vec3().cross(worldUp, normal).normalize();
         const up = worldUp;
-        
+
         const panX = -deltaX * panSensitivity;
         const panY = deltaY * panSensitivity;
-        
+
         const newOffset = window.wallPanState.currentOffset.clone();
         newOffset.add(right.clone().mulScalar(panX));
         newOffset.add(up.clone().mulScalar(panY));
-        
+
         const maxPanX = wallDef.width / 2;
         const maxPanY = wallDef.height / 2;
-        
+
         const offsetRight = newOffset.dot(right);
         const offsetUp = newOffset.dot(up);
-        
+
         const clampedRight = Math.max(-maxPanX, Math.min(maxPanX, offsetRight));
         const clampedUp = Math.max(-maxPanY, Math.min(maxPanY, offsetUp));
-        
+
         window.wallPanState.currentOffset = right.clone().mulScalar(clampedRight)
           .add(up.clone().mulScalar(clampedUp));
       }
-      
+
       lastX = e.clientX;
       lastY = e.clientY;
+      canvas.style.cursor = 'grabbing';
       return;
     }
-    
-    // Normal mouse look rotation
-    // Log on first move after lookAt
-    if (Math.abs(deltaX) > 0 || Math.abs(deltaY) > 0) {
-      const currentEuler = camera.getEulerAngles();
-      console.log('🖱️ First mouse move after lookAt:');
-      console.log('   Current camera euler:', currentEuler.x, currentEuler.y, currentEuler.z);
-      console.log('   Accumulated values:', accumulatedPitch, accumulatedYaw);
-      console.log('   Delta:', deltaX, deltaY);
-    }
-    
-    // Update accumulated values
+
+    // --- Normal Look Rotation ---
     accumulatedYaw += deltaX * 0.1;
     accumulatedPitch += deltaY * 0.1;
-    
-    // Clamp pitch only
     accumulatedPitch = Math.max(-85, Math.min(85, accumulatedPitch));
-    
-    console.log('   New accumulated:', accumulatedPitch, accumulatedYaw);
-    
-    // Build rotation: yaw around world UP, pitch around local RIGHT
+
     const yawQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.UP, accumulatedYaw);
     const pitchQuat = new pc.Quat().setFromAxisAngle(pc.Vec3.RIGHT, accumulatedPitch);
     const finalQuat = new pc.Quat().mul2(yawQuat, pitchQuat);
-    
     camera.setRotation(finalQuat);
-    
-    const afterEuler = camera.getEulerAngles();
-    console.log('   After setRotation euler:', afterEuler.x, afterEuler.y, afterEuler.z);
-    
+
     lastX = e.clientX;
     lastY = e.clientY;
+
+    // Always show grabbing while dragging
+    canvas.style.cursor = 'grabbing';
   });
 
   ['mouseup', 'mouseleave'].forEach(evt =>
     canvas.addEventListener(evt, () => {
       isDragging = false;
-      canvas.style.cursor = 'grab';
+      if (window.isHoveringInteractive) canvas.style.cursor = 'pointer';
+      else canvas.style.cursor = 'grab';
     })
   );
 
+  // Default cursor at start
   canvas.style.cursor = 'grab';
 }
 
@@ -1547,6 +1588,14 @@ function addWASDMovement(app, camera) {
       exitWallMode();
     }
     const moveState = window.movementState;
+
+    if (window.movementState && window.movementState.isMoving !== window.prevIsMoving) {
+      window.prevIsMoving = window.movementState.isMoving;
+      // Notify React if movement state changes
+      if (window.setCameraMoving) {
+        window.setCameraMoving(window.movementState.isMoving);
+      }
+    }
 
     // NEW: Handle wall transition
     if (window.wallTransitionState && window.wallTransitionState.isTransitioning) {
@@ -1805,17 +1854,21 @@ function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
       left: 0,
       width: '100vw',
       height: '100vh',
-      background: 'rgba(0, 0, 0, 0.9)',
+      background: 'rgba(0, 0, 0, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1000
-    }}>
-      <div style={{
+    }}
+    onClick={onClose}
+    >
+      <div 
+      onClick={(e) => e.stopPropagation()}
+      style={{
         background: 'white',
         borderRadius: '15px',
         padding: '20px',
-        maxWidth: '90vw',
+        maxWidth: '60vw',
         width: '90%',
         height: '90vh',
         overflow: 'visible',

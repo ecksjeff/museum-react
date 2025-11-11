@@ -50,7 +50,7 @@ function App() {
       {deviceType === 'mobile' ? <PlayCanvasMuseumMobile /> : <PlayCanvasMuseum />}
       
       {/* Version switcher button */}
-      <button
+      {/* <button
         onClick={() => switchVersion(deviceType === 'mobile' ? 'desktop' : 'mobile')}
         style={{
           position: 'fixed',
@@ -67,7 +67,7 @@ function App() {
         }}
       >
         Switch to {deviceType === 'mobile' ? 'Desktop' : 'Mobile'} Version
-      </button>
+      </button> */}
     </>
   );
 }

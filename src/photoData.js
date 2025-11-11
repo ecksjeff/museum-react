@@ -12,7 +12,12 @@ export const familyPhotos = [
   {
     meshId: '1',
     src: `${CLOUDFLARE_BASE_URL}/images/family/AN_1.jpg`,
-    caption: "he summer of 1950, Oscar and Sarah Wiener stand together in their family pharmacy. Inspiring Roz's leadership skills at an early age."
+    caption: "The summer of 1950, Oscar and Sarah Wiener stand together in their family pharmacy. Inspiring Roz's leadership skills at an early age."
+  },
+  {
+    meshId: '183A',
+    src: `${CLOUDFLARE_BASE_URL}/images/family/AN_183A.jpg`,
+    caption: "The Wiener family expresses their pride after working tirelessly on the campaign. Little does Roz’s parents know that their daughter is about to make history in the City of Angels."
   },
   {
     meshId: '99',
@@ -133,8 +138,8 @@ export const politicsPhotos = [
     caption: "During her campaign, Roz Wiener personally visited thousands of voters. Here, she presents a homemaker with a bar of soap, playfully urging support to 'clean up the City Council.'"
   },
   {
-    meshId: '179b',
-    src: `${CLOUDFLARE_BASE_URL}/images/politics/AN_179b.jpg`,
+    meshId: '179B',
+    src: `${CLOUDFLARE_BASE_URL}/images/politics/AN_179B.jpg`,
     caption: 'Every Monday night, Roz and her volunteers knew everyone would be home watching I Love Lucy. The perfect time to campaign while voters were in high spirits.'
   },
   {
@@ -396,6 +401,11 @@ export const politicsPhotos = [
     meshId: '34',
     src: `${CLOUDFLARE_BASE_URL}/images/politics/AN_34.jpg`,
     caption: "Roz Wyman stands with longtime friend, Nancy Pelosi. Signed with the inscription: 'To Roz, Thanks for making our victory possible. Love, Nancy 2006.'"
+  },
+  {
+    meshId: '551',
+    src: `${CLOUDFLARE_BASE_URL}/images/politics/AN_551.jpg`,
+    caption: 'Walking out of a movie screening, Roz Wyman and Jean Firstenberg are pictured attending the 25th American Film Institute Festival.'
   },
   {
     meshId: '44',
@@ -675,8 +685,8 @@ export const personalPhotos = [
     caption: 'Roz Wyman and Gene Wyman share a flight to San Francisco with Hollywood legends, Gene Kelly and Dean Martin.'
   },
   {
-    meshId: '518',
-    src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_518.jpg`,
+    meshId: '58',
+    src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_58.jpg`,
     caption: "Frank Sinatra, Gene Kelly, Mrs. Gene Kelly, and Roz Wyman are pictured together. A rare mix of dazzling personalities of Hollywood's golden era."
   },
   {
@@ -779,11 +789,11 @@ export const personalPhotos = [
     src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_164.jpg`,
     caption: 'Gene and Roz Wyman share a moment with entertainer Jimmy Durante. A playful intersection of family life and Hollywood charm.'
   },
-  // {
-  //   meshId: '193B',
-  //   src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_193B.jpg`,
-  //   caption: "Jane Wyatt and Roz Wyman at the March of Dimes Resolution. A testament to Wyman's engagement with philanthropic causes and public health advocacy."
-  // },
+  {
+    meshId: '193B',
+    src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_193B.jpg`,
+    caption: "Jane Wyatt and Roz Wyman at the March of Dimes Resolution. A testament to Wyman's engagement with philanthropic causes and public health advocacy."
+  },
   {
     meshId: '192',
     src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_192.jpg`,

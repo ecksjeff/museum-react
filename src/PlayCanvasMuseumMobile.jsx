@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
-import { familyPhotos, documentaryVideo } from './photoData';
+import { familyPhotos, politicsPhotos, personalPhotos, dodgersPhotos } from './photoData';
 
 function PlayCanvasMuseumMobile() {
   const canvasRef = useRef(null);
@@ -235,7 +235,7 @@ function PlayCanvasMuseumMobile() {
 					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
 					console.log('Loading interactive mesh...');
-					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v4.glb";
+					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
 					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
 					let collisionLoaded = false;
@@ -446,6 +446,48 @@ function PlayCanvasMuseumMobile() {
 								const cameraPos = camera.getPosition();
 								const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
 								const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
+
+                // --- Detect photo touch (like desktop slideshow open) ---
+                if (window.currentWallMode && window.interactiveEntity?.model?.meshInstances) {
+                  for (const mi of window.interactiveEntity.model.meshInstances) {
+                    const matName = mi.material.name.toLowerCase();
+                    if (matName.match(/(\d+)/)) { // photo materials are numbered
+                      const aabb = mi.aabb;
+                      const min = aabb.getMin();
+                      const max = aabb.getMax();
+
+                      let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                      let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+                      let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                      let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                      if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+                      if (tmin > tymax || tymin > tmax) continue;
+
+                      tmin = Math.max(tmin, tymin);
+                      tmax = Math.min(tmax, tymax);
+
+                      let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                      let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                      if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+                      if (tmin > tzmax || tzmin > tmax) continue;
+
+                      tmin = Math.max(tmin, tzmin);
+                      if (tmin > 0) {
+                        // ✅ Found a photo touch
+                        const wallName = window.currentWallMode?.wallName;
+                        if (wallName) {
+                          const photoIndex = parseInt(matName.match(/(\d+)/)[0]);
+                          window.openPhotoSlideshow?.(wallName, photoIndex);
+                        }
+                        return; // stop after first hit
+                      }
+                    }
+                  }
+                }
 
 								// 🧱 Wall Hit Detection First
 								let clickedWall = null;
