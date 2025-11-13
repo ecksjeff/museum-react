@@ -782,15 +782,19 @@ function PlayCanvasMuseumMobile() {
         const height = window.innerHeight;
         const canvas = canvasRef.current;
 
-        const dpr = window.devicePixelRatio || 1;
-        const mobileDpr = Math.min(dpr, 2);
+        // Resize DOM canvas
         canvas.style.width = width + 'px';
         canvas.style.height = height + 'px';
+        
+        const dpr = window.devicePixelRatio || 1;
+        const mobileDpr = Math.min(dpr, 2);
         canvas.width = width * mobileDpr;
         canvas.height = height * mobileDpr;
 
+        // Resize PlayCanvas internal buffers
         appRef.current.resizeCanvas(width, height);
 
+        // Fix camera aspect ratio
         const cameraEntity = appRef.current.root.findByName('camera');
         if (cameraEntity && cameraEntity.camera) {
           cameraEntity.camera.aspectRatio = width / height;
@@ -800,32 +804,19 @@ function PlayCanvasMuseumMobile() {
 
     handleResize();
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    // Also listen for orientation change specifically
+    window.addEventListener('orientationchange', () => {
+      setTimeout(handleResize, 100); // Small delay for iOS
+    });
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
-  useEffect(() => {
-    if (!isLoaded) return;
-
-    // Give Safari a moment to settle, then gently scroll to hide bars
-    const hideBars = () => {
-      window.scrollTo(0, 1);
-    };
-
-    // Trigger after a slight delay and again after user taps
-    const timer = setTimeout(hideBars, 500);
-
-    // Hide again on first touch (helps when rotating or switching orientation)
-    window.addEventListener('touchstart', hideBars, { once: true });
-
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('touchstart', hideBars);
-    };
-  }, [isLoaded]);
-
-
   return (
-    <div style={{ width: '100vw', height: 'calc(100dvh + 1px)', position: 'relative', overflow: 'hidden', background: '#000', touchAction: 'none' }}>
+    <div style={{ width: '100vw', height: '100dvh', position: 'relative', overflow: 'hidden', background: '#000', touchAction: 'none' }}>
       {!isLoaded && (
         <div style={{
           position: 'fixed',
@@ -1240,7 +1231,7 @@ function addTouchControls(app, camera, canvas) {
   });
 }
 
-function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
+function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls }) {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(startIndex);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
 
