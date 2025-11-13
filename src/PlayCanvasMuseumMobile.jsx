@@ -2,6 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
 import { familyPhotos, politicsPhotos, personalPhotos, dodgersPhotos } from './photoData';
 
+const devLog = (...args) => {
+  if (import.meta.env.MODE === 'development') {
+    console.log(...args);
+  }
+};
+
 function PlayCanvasMuseumMobile() {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
@@ -13,9 +19,17 @@ function PlayCanvasMuseumMobile() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 	const [viewpoints] = useState([
 		{ name: "Politics", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
-		{ name: "Family Table", position: [0, 2, 4.5], rotation: [0, 0, 0] },
+		{ name: "Family Table", position: [0, 2, 6], rotation: [0, 0, 0] },
 		{ name: "Dodgers", position: [3, 2, 9.25], rotation: [0, -90, 0] },
 		{ name: "Personal", position: [0.20, 2, 7], rotation: [0, 180, 0] }
 	]);
@@ -31,7 +45,7 @@ function PlayCanvasMuseumMobile() {
 		},
 		'Family Photos': {
 			normal: new pc.Vec3(0, 0.5, -0.5).normalize(),
-			center: new pc.Vec3(0, 1.5, 3.0),
+			center: new pc.Vec3(0.05, 1.75, 3.0),
 			width: 0,
 			height: 0,
 			zoomDistance: 0.5,
@@ -103,7 +117,7 @@ function PlayCanvasMuseumMobile() {
   }, []);
 
     useEffect(() => {
-    console.log('Preloading and creating object URLs...');
+    devLog('Preloading and creating object URLs...');
     
     const urlMap = {};
     const allPhotos = [...familyPhotos, ...politicsPhotos, ...personalPhotos, ...dodgersPhotos];
@@ -117,7 +131,7 @@ function PlayCanvasMuseumMobile() {
             const objectUrl = URL.createObjectURL(blob);
             urlMap[photo.src] = objectUrl;
             loadedCount++;
-            console.log(`✓ Created object URL ${loadedCount}/${familyPhotos.length}`);
+            devLog(`✓ Created object URL ${loadedCount}/${familyPhotos.length}`);
             return objectUrl;
         })
         .catch(err => {
@@ -128,7 +142,7 @@ function PlayCanvasMuseumMobile() {
     
     Promise.all(promises).then(() => {
         setImageUrls(urlMap);
-        console.log('🎉 All object URLs created!');
+        devLog('🎉 All object URLs created!');
     });
     
     // Cleanup object URLs when component unmounts
@@ -148,7 +162,7 @@ function PlayCanvasMuseumMobile() {
     if (isInitializing.current || appRef.current) return;
 
     isInitializing.current = true;
-    console.log('Initializing PlayCanvas Mobile with size:', canvasSize);
+    devLog('Initializing PlayCanvas Mobile with size:', canvasSize);
 
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
@@ -197,7 +211,7 @@ function PlayCanvasMuseumMobile() {
     // });
     // app.root.addChild(ambientLight);
 
-    console.log('Loading splat...');
+    devLog('Loading splat...');
     const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/SplatFinal.sog";
 
     const xhr = new XMLHttpRequest();
@@ -207,7 +221,7 @@ function PlayCanvasMuseumMobile() {
     xhr.onprogress = (event) => {
     if (event.lengthComputable) {
         const percentComplete = (event.loaded / event.total) * 100;
-        console.log(`Download progress: ${percentComplete.toFixed(1)}%`);
+        devLog(`Download progress: ${percentComplete.toFixed(1)}%`);
         // Splat takes 0-70% of the loading bar
         setLoadProgress(Math.floor(percentComplete * 0.7));
     } else {
@@ -217,7 +231,7 @@ function PlayCanvasMuseumMobile() {
 
     xhr.onload = () => {
     if (xhr.status === 200) {
-        console.log('Download complete, processing...');
+        devLog('Download complete, processing...');
         setLoadProgress(75); // Splat done, now 75%
         
         const blob = new Blob([xhr.response]);
@@ -229,7 +243,7 @@ function PlayCanvasMuseumMobile() {
         });
 
         asset.on('load', () => {
-        console.log('Splat loaded! Adding to running scene...');
+        devLog('Splat loaded! Adding to running scene...');
         setLoadProgress(80); // Splat added to scene
           
 					const splatEntity = new pc.Entity('splat');
@@ -240,11 +254,11 @@ function PlayCanvasMuseumMobile() {
 					app.root.addChild(splatEntity);
 
 					// === LOAD BOTH COLLISION AND INTERACTIVE MESH IN PARALLEL ===
-					console.log('Loading collision mesh...');
+					devLog('Loading collision mesh...');
 					const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube_v2.glb";
 					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
-					console.log('Loading interactive mesh...');
+					devLog('Loading interactive mesh...');
 					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
 					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
@@ -253,17 +267,17 @@ function PlayCanvasMuseumMobile() {
 
 					const checkBothLoaded = () => {
 						if (collisionLoaded && interactiveLoaded) {
-							console.log('Both meshes loaded! Showing scene...');
+							devLog('Both meshes loaded! Showing scene...');
 							setIsLoaded(true);
 						}
 						if (collisionLoaded) {
-							console.log('Collision loaded! Showing scene...');
+							devLog('Collision loaded! Showing scene...');
 							setIsLoaded(true);
 						}
 					};
 
 					collisionAsset.on('load', () => {
-						console.log('Collision mesh loaded!');
+						devLog('Collision mesh loaded!');
 						
 						const collisionEntity = new pc.Entity('collision-cube');
 						collisionEntity.addComponent('model', {
@@ -293,7 +307,7 @@ function PlayCanvasMuseumMobile() {
 					});
 
 					interactiveAsset.on('load', () => {
-						console.log('Interactive mesh loaded!');
+						devLog('Interactive mesh loaded!');
 						
 						const interactiveEntity = interactiveAsset.resource.instantiateModelEntity();
 						
@@ -458,12 +472,12 @@ function PlayCanvasMuseumMobile() {
 								const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
 
                 // --- Detect photo touch (like desktop slideshow open) ---
-                console.log('Before photo check - window.currentWallMode:', window.currentWallMode);
+                devLog('Before photo check - window.currentWallMode:', window.currentWallMode);
 
                 if (window.currentWallMode && window.interactiveEntity?.model?.meshInstances) {
-                  console.log('Inside photo detection block');
-                  console.log('interactiveEntity:', window.interactiveEntity);
-                  console.log('meshInstances count:', window.interactiveEntity.model.meshInstances.length);
+                  devLog('Inside photo detection block');
+                  devLog('interactiveEntity:', window.interactiveEntity);
+                  devLog('meshInstances count:', window.interactiveEntity.model.meshInstances.length);
                   let photoFound = false;
                   
                   for (const mi of window.interactiveEntity.model.meshInstances) {
@@ -474,7 +488,7 @@ function PlayCanvasMuseumMobile() {
                     }
 
                     if (matName.match(/(\d+)/)) { // photo materials are numbered
-                      console.log('Checking numbered material:', matName);
+                      devLog('Checking numbered material:', matName);
                       const aabb = mi.aabb;
                       const min = aabb.getMin();
                       const max = aabb.getMax();
@@ -522,10 +536,10 @@ function PlayCanvasMuseumMobile() {
                         
                         // Find the photo index by matching the material name to the photo meshId
                         const photoIndex = photos.findIndex(photo => photo.meshId === materialName);
-                        console.log('Material name:', materialName, 'Found at index:', photoIndex);
+                        devLog('Material name:', materialName, 'Found at index:', photoIndex);
                         
                         if (photoIndex !== -1) {
-                          console.log('Setting wallPhotoMode...');
+                          devLog('Setting wallPhotoMode...');
                           setWallPhotoMode({
                             photos: photos,
                             startIndex: photoIndex,
@@ -537,11 +551,11 @@ function PlayCanvasMuseumMobile() {
                     }
                   }
                   
-                  console.log('After loop - photoFound:', photoFound);
+                  devLog('After loop - photoFound:', photoFound);
 
                   // If we found a photo, stop here - don't continue to wall detection
                   if (photoFound) {
-                    console.log('RETURNING EARLY - should not continue to wall detection');
+                    devLog('RETURNING EARLY - should not continue to wall detection');
                     isTouching = false;
                     
                     isDragging = false;
@@ -549,7 +563,7 @@ function PlayCanvasMuseumMobile() {
                   }
                 }
                 
-                console.log('Continuing to wall detection...');
+                devLog('Continuing to wall detection...');
 								// 🧱 Wall Hit Detection First
                 if (!window.currentWallMode) {
                   let clickedWall = null;
@@ -656,7 +670,7 @@ function PlayCanvasMuseumMobile() {
 									});
 
 									if (tappedTable) {
-										console.log('Table tapped!');
+										devLog('Table tapped!');
 										setIsInteractiveMode(true);
 									}
 								}
@@ -732,7 +746,7 @@ function PlayCanvasMuseumMobile() {
   // --- Cleanup ---
   useEffect(() => {
     return () => {
-      console.log('Cleaning up PlayCanvas on unmount...');
+      devLog('Cleaning up PlayCanvas on unmount...');
       if (appRef.current) {
         appRef.current.destroy();
         appRef.current = null;
@@ -770,8 +784,29 @@ function PlayCanvasMuseumMobile() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    // Give Safari a moment to settle, then gently scroll to hide bars
+    const hideBars = () => {
+      window.scrollTo(0, 1);
+    };
+
+    // Trigger after a slight delay and again after user taps
+    const timer = setTimeout(hideBars, 500);
+
+    // Hide again on first touch (helps when rotating or switching orientation)
+    window.addEventListener('touchstart', hideBars, { once: true });
+
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener('touchstart', hideBars);
+    };
+  }, [isLoaded]);
+
+
   return (
-    <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden', background: '#000', touchAction: 'none' }}>
+    <div style={{ width: '100vw', height: 'calc(100dvh + 1px)', position: 'relative', overflow: 'hidden', background: '#000', touchAction: 'none' }}>
       {!isLoaded && (
         <div style={{
           position: 'fixed',
@@ -794,9 +829,9 @@ function PlayCanvasMuseumMobile() {
         </div>
       )}
 
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+      <canvas ref={canvasRef} style={{ width: '100%', height: '100dvh', display: 'block' }} />
 
-      {isLoaded && (
+      {isLoaded && !wallInteractionMode && !isLandscape && (
         <div style={{
           position: 'absolute', top: '10px', left: '10px',
           color: 'white', background: 'rgba(0, 0, 0, 0.7)',
@@ -808,25 +843,37 @@ function PlayCanvasMuseumMobile() {
           <div>Tap on a photo to learn more</div>
         </div>
       )}
+      {isLoaded && !wallInteractionMode && isLandscape && (
+        <div style={{
+          position: 'absolute', top: '10px', left: '40px',
+          color: 'white', background: 'rgba(0, 0, 0, 0.7)',
+          padding: '10px', borderRadius: '8px', fontSize: '12px', zIndex: 100, maxWidth: '200px'
+        }}>
+          <div><strong>Tips</strong></div>
+          <div>Swipe up and down to move</div>
+          <div>Swipe left and right to Turn</div>
+          <div>Tap on a photo to learn more</div>
+        </div>
+      )}
         {isLoaded && !wallInteractionMode && (
         <div style={{
-            position: 'fixed', // Changed from 'absolute' to 'fixed'
-            bottom: '40px', // Increased from '20px' to avoid browser UI
+            position: 'fixed', 
+            bottom: isLandscape ? '10px' : '40px', 
             left: '50%',
             transform: 'translateX(-50%)',
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            background: 'rgba(0, 0, 0, 0.8)', // Slightly more opaque
+            background: 'rgba(0, 0, 0, 0.8)', 
             padding: '12px 18px',
             borderRadius: '12px',
-            zIndex: 1000, // Increased z-index
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' // Add shadow for visibility
+            zIndex: 1000, 
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' 
         }}>
             <button
             onClick={() => setViewpoint((currentViewpointIndex - 1 + viewpoints.length) % viewpoints.length)}
             style={{
-                padding: '10px 14px', // Slightly larger for easier tapping
+                padding: '10px 14px', 
                 background: '#2196F3',
                 color: 'white',
                 border: 'none',
@@ -834,7 +881,7 @@ function PlayCanvasMuseumMobile() {
                 cursor: 'pointer',
                 fontSize: '18px',
                 fontWeight: 'bold',
-                minWidth: '44px', // iOS recommended tap target size
+                minWidth: '44px', 
                 minHeight: '44px'
             }}
             >
@@ -883,27 +930,68 @@ function PlayCanvasMuseumMobile() {
 					onClick={() => {
 						if (window.exitWallMode) window.exitWallMode();
 					}}
-					style={{
-						position: 'absolute',
-						top: '60px',
-						right: '15px',
-						width: '45px',
-						height: '45px',
-						borderRadius: '50%',
-						background: 'rgba(255, 0, 0, 0.6)',
-						color: '#fff',
-						fontSize: '24px',
-						border: 'none',
-						zIndex: 2000,
-						cursor: 'pointer'
-					}}
-				>
-					×
-				</button>
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            padding: '12px 24px',
+            background: 'rgba(244, 67, 54, 0.9)',
+            color: 'white',
+            border: 'none',
+            borderRadius: '8px',
+            fontSize: '12px',
+            fontWeight: 'bold',
+            cursor: 'pointer',
+            zIndex: 999,
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+          }}
+        >
+          <div>Leave</div> 
+          <div>wall</div>
+        </button>
 			)}
+      {wallInteractionMode && !isLandscape && (
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '20px',
+          textAlign: 'center',
+          padding: '12px 24px',
+          background: 'rgba(33, 150, 243, 0.9)',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          zIndex: 999,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        }}>
+          Viewing {wallInteractionMode.wallName}
+          <br />Tap a photo to learn more!
+        </div>
+      )}
+      {wallInteractionMode && isLandscape && (
+        <div style={{
+          position: 'absolute',
+          top: '20px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          textAlign: 'center',
+          padding: '12px 24px',
+          background: 'rgba(33, 150, 243, 0.9)',
+          color: 'white',
+          borderRadius: '8px',
+          fontSize: '12px',
+          fontWeight: 'bold',
+          zIndex: 999,
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)'
+        }}>
+          Viewing {wallInteractionMode.wallName}
+          <br />Tap a photo to learn more!
+        </div>
+      )}
       {wallPhotoMode && (
         <>
-        {console.log('Rendering PhotoSlideshow with:', wallPhotoMode)}
+        {devLog('Rendering PhotoSlideshow with:', wallPhotoMode)}
         <PhotoSlideshow
           photos={wallPhotoMode.photos}
           startIndex={wallPhotoMode.startIndex}
@@ -1126,8 +1214,16 @@ function addTouchControls(app, camera, canvas) {
 }
 
 function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
-  console.log('PhotoSlideshow rendered!', { photos: photos.length, startIndex, title });
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(startIndex);
+  const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const nextPhoto = () => {
     setCurrentPhotoIndex((currentPhotoIndex + 1) % photos.length);
@@ -1141,124 +1237,203 @@ function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
   const displaySrc = imageUrls[currentPhoto.src] || currentPhoto.src;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      width: '100vw',
-      height: '100vh',
-      background: 'rgba(0, 0, 0, 0.9)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 2000
-    }}
-    onClick={onClose}
-    >
-      <div 
-      onClick={(e) => e.stopPropagation()}
+    <div
       style={{
-        background: 'white',
-        borderRadius: '15px',
-        padding: '20px',
-        width: '90%',
-        maxWidth: '500px',
-        maxHeight: '90vh',
-        overflow: 'visible',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: 'rgba(0, 0, 0, 0.9)',
         display: 'flex',
-        flexDirection: 'column',
-        position: 'relative',
-        top: '-50px'
-      }}>
-        <button 
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 2000,
+      }}
+      onClick={onClose}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'white',
+          borderRadius: '15px',
+          padding: isLandscape ? '10px' : '20px',
+          width: isLandscape ? '95vw' : '90%',
+          maxWidth: '450px',
+          height: isLandscape ? '90dvh' : '80vh',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          position: 'relative',
+          top: isLandscape ? '-50px' : 'inherit',
+        }}
+      >
+        {/* Close button */}
+        <button
           onClick={onClose}
           style={{
             position: 'absolute',
-            top: '10px',
+            top: '5px',
             right: '10px',
-            background: '#f44336',
-            color: 'white',
+            background: '#fff',
+            color: 'red',
             border: 'none',
             borderRadius: '50%',
             width: '40px',
             height: '40px',
             cursor: 'pointer',
-            fontSize: '20px',
-            zIndex: 2001
+            fontSize: '36px',
+            zIndex: 2001,
           }}
         >
           ×
         </button>
-        
-        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#333', fontSize: '18px' }}>
-            {title}
-          </h3>
-          
-          <img 
+
+        {/* Photo area */}
+        <div
+          style={{
+            position: 'relative',
+            flex: 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <img
             src={displaySrc}
             alt={currentPhoto.caption || `Photo ${currentPhotoIndex + 1}`}
             style={{
               maxWidth: '100%',
-              maxHeight: '50vh',
+              maxHeight: isLandscape ? '80dvh' : '50vh',
               objectFit: 'contain',
               borderRadius: '10px',
               boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
-              margin: '0 auto'
             }}
           />
-          
-          <div style={{ margin: '15px 0', color: '#666' }}>
+
+          {/* Landscape caption overlay */}
+          {isLandscape && currentPhoto.caption && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                background: 'rgba(0,0,0,0.65)',
+                color: 'white',
+                padding: '6px 12px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                maxWidth: '80%',
+                textAlign: 'center',
+              }}
+            >
+              {currentPhoto.caption}
+            </div>
+          )}
+
+          {/* Left / Right buttons for landscape */}
+          {isLandscape && (
+            <>
+              <button
+                onClick={previousPhoto}
+                style={{
+                  position: 'absolute',
+                  left: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  opacity: 0.9,
+                }}
+              >
+                ←
+              </button>
+              <button
+                onClick={nextPhoto}
+                style={{
+                  position: 'absolute',
+                  right: '10px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: '#2196F3',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  padding: '12px 16px',
+                  cursor: 'pointer',
+                  fontSize: '20px',
+                  opacity: 0.9,
+                }}
+              >
+                →
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Portrait-only info section */}
+        {!isLandscape && (
+          <div style={{ margin: '15px 0', color: '#666', textAlign: 'center' }}>
             <span style={{ fontWeight: 'bold' }}>
               {currentPhotoIndex + 1} of {photos.length}
             </span>
             {currentPhoto.caption && (
-              <p style={{ marginTop: '10px', fontSize: '14px' }}>
-                {currentPhoto.caption}
-              </p>
+              <p style={{ marginTop: '5px', fontSize: '14px' }}>{currentPhoto.caption}</p>
             )}
           </div>
-        </div>
-        
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginTop: '10px'
-        }}>
-          <button 
-            onClick={previousPhoto}
-            style={{
-              background: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '12px 20px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            ←
-          </button>
+        )}
 
-          <button 
-            onClick={nextPhoto}
+        {/* Portrait-only bottom navigation */}
+        {!isLandscape && (
+          <div
             style={{
-              background: '#2196F3',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              padding: '12px 20px',
-              cursor: 'pointer',
-              fontSize: '14px'
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginTop: '10px',
             }}
           >
-            →
-          </button>
-        </div>
+            <button
+              onClick={previousPhoto}
+              style={{
+                background: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              ←
+            </button>
+
+            <button
+              onClick={nextPhoto}
+              style={{
+                background: '#2196F3',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '12px 20px',
+                cursor: 'pointer',
+                fontSize: '14px',
+              }}
+            >
+              →
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
 
 export default PlayCanvasMuseumMobile;

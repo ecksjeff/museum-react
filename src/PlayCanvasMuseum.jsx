@@ -2,6 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import * as pc from 'playcanvas';
 import { familyPhotos, politicsPhotos, personalPhotos, dodgersPhotos } from './photoData';
 
+const devLog = (...args) => {
+  if (import.meta.env.MODE === 'development') {
+    console.log(...args);
+  }
+};
+
 function PlayCanvasMuseum() {
   const canvasRef = useRef(null);
   const appRef = useRef(null);
@@ -137,7 +143,7 @@ function PlayCanvasMuseum() {
 
   // --- Preload and cache all photos (family and politics) ---
   useEffect(() => {
-    console.log('Preloading and creating object URLs...');
+    devLog('Preloading and creating object URLs...');
     
     const urlMap = {};
     const allPhotos = [...familyPhotos, ...politicsPhotos, ...personalPhotos, ...dodgersPhotos];
@@ -151,7 +157,7 @@ function PlayCanvasMuseum() {
           const objectUrl = URL.createObjectURL(blob);
           urlMap[photo.src] = objectUrl;
           loadedCount++;
-          console.log(`✓ Created object URL ${loadedCount}/${allPhotos.length}`);
+          devLog(`✓ Created object URL ${loadedCount}/${allPhotos.length}`);
           return objectUrl;
         })
         .catch(err => {
@@ -162,7 +168,7 @@ function PlayCanvasMuseum() {
     
     Promise.all(promises).then(() => {
       setImageUrls(urlMap);
-      console.log('🎉 All object URLs created!');
+      devLog('🎉 All object URLs created!');
     });
     
     // Cleanup object URLs when component unmounts
@@ -182,7 +188,7 @@ function PlayCanvasMuseum() {
     if (isInitializing.current || appRef.current) return;
 
     isInitializing.current = true;
-    console.log('Initializing PlayCanvas once with size:', canvasSize);
+    devLog('Initializing PlayCanvas once with size:', canvasSize);
 
     const canvas = canvasRef.current;
     canvas.width = canvasSize.width;
@@ -227,7 +233,7 @@ function PlayCanvasMuseum() {
     // });
     // app.root.addChild(ambientLight);
 
-    console.log('Loading splat...');
+    devLog('Loading splat...');
     const splatUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/splats/SplatFinal.sog";
 
     // Track download progress with XHR
@@ -238,7 +244,7 @@ function PlayCanvasMuseum() {
     xhr.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = (event.loaded / event.total) * 100;
-        console.log(`Download progress: ${percentComplete.toFixed(1)}%`);
+        devLog(`Download progress: ${percentComplete.toFixed(1)}%`);
         // Splat takes 0-70% of the loading bar
         setLoadProgress(Math.floor(percentComplete * 0.7));
       } else {
@@ -248,7 +254,7 @@ function PlayCanvasMuseum() {
 
     xhr.onload = () => {
       if (xhr.status === 200) {
-        console.log('Download complete, processing...');
+        devLog('Download complete, processing...');
         setLoadProgress(75); // Splat done, now 75%
         
         // Create blob URL from the downloaded data
@@ -262,7 +268,7 @@ function PlayCanvasMuseum() {
         });
 
         asset.on('load', () => {
-          console.log('Splat loaded! Adding to running scene...');
+          devLog('Splat loaded! Adding to running scene...');
           setLoadProgress(80);
           
           const splatEntity = new pc.Entity('splat');
@@ -273,11 +279,11 @@ function PlayCanvasMuseum() {
           app.root.addChild(splatEntity);
 
           // === LOAD BOTH COLLISION AND INTERACTIVE MESH IN PARALLEL ===
-          console.log('Loading collision mesh...');
+          devLog('Loading collision mesh...');
           const collisionUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/collision-cube_v2.glb";
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
-          console.log('Loading interactive mesh...');
+          devLog('Loading interactive mesh...');
           const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
           const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
@@ -286,7 +292,7 @@ function PlayCanvasMuseum() {
 
           const checkBothLoaded = () => {
             if (collisionLoaded && interactiveLoaded) {
-              console.log('Both meshes loaded! Processing...');
+              devLog('Both meshes loaded! Processing...');
               
               // Animate from 98% to 100% over 1 second to cover processing time
               let currentProgress = 95;
@@ -303,7 +309,7 @@ function PlayCanvasMuseum() {
           };
 
           collisionAsset.on('load', () => {
-            console.log('Collision mesh loaded!');
+            devLog('Collision mesh loaded!');
             
             const collisionEntity = new pc.Entity('collision-cube');
             collisionEntity.addComponent('model', {
@@ -333,11 +339,11 @@ function PlayCanvasMuseum() {
                   
                   mi.material = material;
                   
-                  console.log('Material applied, AABB:', mi.aabb.getMin(), mi.aabb.getMax());
+                  devLog('Material applied, AABB:', mi.aabb.getMin(), mi.aabb.getMax());
                 });
               }
               
-              console.log('Entity layers:', collisionEntity.model.layers);
+              devLog('Entity layers:', collisionEntity.model.layers);
             }, 100);
 
             collisionEntity.setPosition(0, 0, 0);
@@ -345,7 +351,7 @@ function PlayCanvasMuseum() {
             collisionEntity.setEulerAngles(0, 0, 0);
 
             app.root.addChild(collisionEntity);
-            console.log('Collision entity position:', collisionEntity.getPosition());
+            devLog('Collision entity position:', collisionEntity.getPosition());
 
             window.collisionMesh = collisionEntity;
             
@@ -354,7 +360,7 @@ function PlayCanvasMuseum() {
           });
 
           interactiveAsset.on('load', () => {
-            console.log('Interactive mesh loaded!');
+            devLog('Interactive mesh loaded!');
             
             const interactiveEntity = interactiveAsset.resource.instantiateModelEntity();
             
@@ -363,7 +369,7 @@ function PlayCanvasMuseum() {
             interactiveEntity.setEulerAngles(0, 0, 0);
 
             app.root.addChild(interactiveEntity);
-            console.log('Interactive mesh added at:', interactiveEntity.getPosition());
+            devLog('Interactive mesh added at:', interactiveEntity.getPosition());
             
             // Make the mesh invisible immediately
             if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
@@ -373,24 +379,24 @@ function PlayCanvasMuseum() {
             }
             
             // Log all the child objects so we can see what's labeled
-            console.log('=== Interactive mesh structure ===');
+            devLog('=== Interactive mesh structure ===');
             
             // Check the parent entity
             if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-              console.log(`Parent has ${interactiveEntity.model.meshInstances.length} mesh instances:`);
+              devLog(`Parent has ${interactiveEntity.model.meshInstances.length} mesh instances:`);
               interactiveEntity.model.meshInstances.forEach((mi, i) => {
-                console.log(`  [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
+                devLog(`  [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
               });
             }
             
             // Check children
             interactiveEntity.children.forEach((child, index) => {
-              console.log(`Child ${index}: ${child.name}`);
+              devLog(`Child ${index}: ${child.name}`);
               
               if (child.model && child.model.meshInstances) {
-                console.log(`  Child has ${child.model.meshInstances.length} mesh instances:`);
+                devLog(`  Child has ${child.model.meshInstances.length} mesh instances:`);
                 child.model.meshInstances.forEach((mi, i) => {
-                  console.log(`    [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
+                  devLog(`    [${i}] Node: ${mi.node.name}, Material: ${mi.material.name}`);
                 });
               }
             });
@@ -424,8 +430,8 @@ function PlayCanvasMuseum() {
 
               // NEW: Check if in wall mode - handle photo clicks
               if (window.currentWallMode) {
-                console.log('🖼️ In wall mode, checking for photo clicks...');
-                console.log('Current wall mode:', window.currentWallMode);
+                devLog('🖼️ In wall mode, checking for photo clicks...');
+                devLog('Current wall mode:', window.currentWallMode);
                 const camera = app.root.findByName('camera');
                 if (!camera) return;
                 
@@ -478,75 +484,75 @@ function PlayCanvasMuseum() {
                     if (tmin > 0 && tmin < closestPhotoDistance) {
                       closestPhotoDistance = tmin;
                       clickedPhoto = { meshId: materialName, materialName: materialName };
-                      console.log(`  ✓ Photo HIT! Mesh: ${meshNumber}, Material: ${materialName}`);
+                      devLog(`  ✓ Photo HIT! Mesh: ${meshNumber}, Material: ${materialName}`);
                     }
                   });
                   
                   if (clickedPhoto) {
-                    console.log(`Found clicked photo:`, clickedPhoto);
-                    console.log(`Checking if wall mode matches...`);
+                    devLog(`Found clicked photo:`, clickedPhoto);
+                    devLog(`Checking if wall mode matches...`);
                     
                     if (window.currentWallMode.wallName === 'Politics Photos') {
-                      console.log(`Opening slideshow for Politics wall, starting at mesh ${clickedPhoto.meshId}`);
-                      console.log(`Politics photos array:`, politicsPhotos);
+                      devLog(`Opening slideshow for Politics wall, starting at mesh ${clickedPhoto.meshId}`);
+                      devLog(`Politics photos array:`, politicsPhotos);
                       
                       // Find the index of the clicked photo in politicsPhotos array
                       const photoIndex = politicsPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
-                      console.log(`Photo index found:`, photoIndex);
+                      devLog(`Photo index found:`, photoIndex);
                       
                       if (photoIndex !== -1) {
-                        console.log(`Setting wallPhotoMode state...`);
+                        devLog(`Setting wallPhotoMode state...`);
                         setWallPhotoMode({
                           wallName: 'Politics Photos',
                           startIndex: photoIndex
                         });
                       } else {
                         console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in politicsPhotos array`);
-                        console.log(`Available mesh IDs:`, politicsPhotos.map(p => p.meshId));
+                        devLog(`Available mesh IDs:`, politicsPhotos.map(p => p.meshId));
                       }
                     } else if (window.currentWallMode.wallName === 'Personal Photos') {
-                      console.log(`Opening slideshow for Personal wall, starting at mesh ${clickedPhoto.meshId}`);
-                      console.log(`Personal photos array:`, personalPhotos);
+                      devLog(`Opening slideshow for Personal wall, starting at mesh ${clickedPhoto.meshId}`);
+                      devLog(`Personal photos array:`, personalPhotos);
                       
                       // Find the index of the clicked photo in personalPhotos array
                       const photoIndex = personalPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
-                      console.log(`Photo index found:`, photoIndex);
+                      devLog(`Photo index found:`, photoIndex);
                       
                       if (photoIndex !== -1) {
-                        console.log(`Setting wallPhotoMode state...`);
+                        devLog(`Setting wallPhotoMode state...`);
                         setWallPhotoMode({
                           wallName: 'Personal Photos',
                           startIndex: photoIndex
                         });
                       } else {
                         console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in personalPhotos array`);
-                        console.log(`Available mesh IDs:`, personalPhotos.map(p => p.meshId));
+                        devLog(`Available mesh IDs:`, personalPhotos.map(p => p.meshId));
                       }
                     } else if (window.currentWallMode.wallName === 'Dodgers Photos') {
-                      console.log(`Opening slideshow for Dodgers wall, starting at mesh ${clickedPhoto.meshId}`);
-                      console.log(`Dodgers photos array:`, dodgersPhotos);
+                      devLog(`Opening slideshow for Dodgers wall, starting at mesh ${clickedPhoto.meshId}`);
+                      devLog(`Dodgers photos array:`, dodgersPhotos);
                       
                       // Find the index of the clicked photo in dodgersPhotos array
                       const photoIndex = dodgersPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
-                      console.log(`Photo index found:`, photoIndex);
+                      devLog(`Photo index found:`, photoIndex);
                       
                       if (photoIndex !== -1) {
-                        console.log(`Setting wallPhotoMode state...`);
+                        devLog(`Setting wallPhotoMode state...`);
                         setWallPhotoMode({
                           wallName: 'Dodgers Photos',
                           startIndex: photoIndex
                         });
                       } else {
                         console.warn(`Photo with mesh ID ${clickedPhoto.meshId} not found in dodgersPhotos array`);
-                        console.log(`Available mesh IDs:`, dodgersPhotos.map(p => p.meshId));
+                        devLog(`Available mesh IDs:`, dodgersPhotos.map(p => p.meshId));
                       }
                     } else if (window.currentWallMode.wallName === 'Family Photos') {
-                      console.log(`Opening slideshow for Family Photos, starting at mesh ${clickedPhoto.meshId}`);
+                      devLog(`Opening slideshow for Family Photos, starting at mesh ${clickedPhoto.meshId}`);
                       const photoIndex = familyPhotos.findIndex(p => p.meshId === clickedPhoto.meshId);
-                      console.log(`Photo index found:`, photoIndex);
+                      devLog(`Photo index found:`, photoIndex);
                       
                       if (photoIndex !== -1) {
-                        console.log(`Setting wallPhotoMode state...`);
+                        devLog(`Setting wallPhotoMode state...`);
                         setWallPhotoMode({
                           wallName: 'Family Photos',
                           startIndex: photoIndex
@@ -556,7 +562,7 @@ function PlayCanvasMuseum() {
                       }
                     }
                   } else {
-                    console.log(`No photo clicked`);
+                    devLog(`No photo clicked`);
                   }
                 }
                 return;
@@ -618,22 +624,22 @@ function PlayCanvasMuseum() {
                 });
                 
                 if (clickedTable) {
-                  console.log(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
+                  devLog(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
                   enterWallMode('Family Photos', new pc.Vec3(0, 1.5, 1));  // Enter wall mode instead
                   return;
                 }
               }
               
               // SECOND: Check for wall clicks using AABB intersection
-              console.log('🖱️ Click detected, checking for walls...');
+              devLog('🖱️ Click detected, checking for walls...');
               let clickedWall = null;
               if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
-                console.log(`Found ${interactiveEntity.model.meshInstances.length} mesh instances to check`);
+                devLog(`Found ${interactiveEntity.model.meshInstances.length} mesh instances to check`);
                 let closestWallDistance = Infinity;
                 
                 interactiveEntity.model.meshInstances.forEach((mi, index) => {
                   const materialName = mi.material.name;
-                  console.log(`  [${index}] Material: ${materialName}`);
+                  devLog(`  [${index}] Material: ${materialName}`);
                   
                   // Check all mesh instances for hits, regardless of material name
                   const aabb = mi.aabb;
@@ -674,13 +680,13 @@ function PlayCanvasMuseum() {
                     }
                     
                     closestWallDistance = tmin;
-                    console.log(`    ✓ HIT! Material: ${materialName}, Distance: ${tmin}, Point:`, hitPoint);
+                    devLog(`    ✓ HIT! Material: ${materialName}, Distance: ${tmin}, Point:`, hitPoint);
                     clickedWall = { name: materialName, index: index, hitPoint: hitPoint };
                   }
                 });
                 
                 if (clickedWall) {
-                  console.log(`Clicked on wall: ${clickedWall.name}`);
+                  devLog(`Clicked on wall: ${clickedWall.name}`);
                   
                   // Determine which wall based on material name or position
                   let wallName = null;
@@ -717,7 +723,7 @@ function PlayCanvasMuseum() {
                     
                     if (intersectionPoint.x >= min.x && intersectionPoint.x <= max.x &&
                         intersectionPoint.z >= min.z && intersectionPoint.z <= max.z) {
-                      console.log('Floor clicked at:', intersectionPoint);
+                      devLog('Floor clicked at:', intersectionPoint);
                       
                       // Set the target at camera height (1.5)
                       const targetPos = new pc.Vec3(intersectionPoint.x, 2, intersectionPoint.z);
@@ -725,8 +731,8 @@ function PlayCanvasMuseum() {
                       // Find the closest look-at point for this target position
                       const closestLookAt = findClosestLookAtPoint(targetPos);
 
-                      console.log('🎯 Camera will look at:', closestLookAt.name, 'at position:', closestLookAt.position);
-                      console.log('📍 Camera moving to:', targetPos);
+                      devLog('🎯 Camera will look at:', closestLookAt.name, 'at position:', closestLookAt.position);
+                      devLog('📍 Camera moving to:', targetPos);
 
                       // Update UI immediately to show which viewpoint we're looking at
                       const lookAtToViewpointMap = {
@@ -764,10 +770,10 @@ function PlayCanvasMuseum() {
                       const horizontalDist = Math.sqrt(forward.x * forward.x + forward.z * forward.z);
                       const targetPitch = Math.atan2(-forward.y, horizontalDist) * pc.math.RAD_TO_DEG;
 
-                      console.log('🎯 Target yaw/pitch for animation:', targetPitch, targetYaw);
-                      console.log('🎯 Forward vector:', forward.x, forward.y, forward.z);
-                      console.log('🎯 LookAt position:', closestLookAt.position.x, closestLookAt.position.y, closestLookAt.position.z);
-                      console.log('🎯 Camera target position:', targetPos.x, targetPos.y, targetPos.z);
+                      devLog('🎯 Target yaw/pitch for animation:', targetPitch, targetYaw);
+                      devLog('🎯 Forward vector:', forward.x, forward.y, forward.z);
+                      devLog('🎯 LookAt position:', closestLookAt.position.x, closestLookAt.position.y, closestLookAt.position.z);
+                      devLog('🎯 Camera target position:', targetPos.x, targetPos.y, targetPos.z);
 
                       // Get current yaw/pitch from the mouse look system
                       const startValues = window.getMouseLookValues ? window.getMouseLookValues() : { yaw: 0, pitch: 0 };
@@ -1122,7 +1128,7 @@ function PlayCanvasMuseum() {
             const camera = app.root.findByName('camera');
             if (!camera) return;
 
-            console.log(`🎨 Entering wall mode: ${wallName}`);
+            devLog(`🎨 Entering wall mode: ${wallName}`);
 
             // Get current mouse look values instead of camera euler (which might be flipped)
             const currentMouseLook = window.getMouseLookValues ? window.getMouseLookValues() : { yaw: 0, pitch: 0 };
@@ -1209,7 +1215,7 @@ function PlayCanvasMuseum() {
   // --- Only clean up when the component unmounts ---
   useEffect(() => {
     return () => {
-      console.log('Cleaning up PlayCanvas on unmount...');
+      devLog('Cleaning up PlayCanvas on unmount...');
       if (appRef.current) {
         appRef.current.destroy();
         appRef.current = null;
@@ -1603,14 +1609,14 @@ function addWASDMovement(app, camera) {
       state.progress += dt / state.duration;
 
         if (state.progress >= 1.0) {
-          console.log('🎬 Wall transition completing!');
-          console.log('  Target position:', state.targetPosition);
-          console.log('  Target rotation (euler):', state.targetRotation);
+          devLog('🎬 Wall transition completing!');
+          devLog('  Target position:', state.targetPosition);
+          devLog('  Target rotation (euler):', state.targetRotation);
           
           camera.setPosition(state.targetPosition);
           camera.setEulerAngles(state.targetRotation);
           
-          console.log('  Camera after setEulerAngles:', camera.getEulerAngles());
+          devLog('  Camera after setEulerAngles:', camera.getEulerAngles());
           
           state.isTransitioning = false;
           
@@ -1619,10 +1625,10 @@ function addWASDMovement(app, camera) {
             // Normalize yaw to within 0–360 range, but avoid 360 because it wraps to 0
             let normalizedYaw = state.targetRotation.y % 360;
             if (normalizedYaw > 180) normalizedYaw -= 360; // keep within -180..180 range
-            console.log('  Syncing mouse look to:', state.targetRotation.y, state.targetRotation.x);
+            devLog('  Syncing mouse look to:', state.targetRotation.y, state.targetRotation.x);
             window.syncMouseLookValues(state.targetRotation.y, state.targetRotation.x);
             const synced = window.getMouseLookValues();
-            console.log('  After sync, mouse look values are:', synced);
+            devLog('  After sync, mouse look values are:', synced);
           }
         state.isTransitioning = false;
         // Don't return - fall through to wall pan mode

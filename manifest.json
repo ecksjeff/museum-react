@@ -1,0 +1,16 @@
+{
+  "name": "Museum",
+  "short_name": "Museum",
+  "start_url": ".",
+  "display": "standalone",
+  "display_override": ["fullscreen", "standalone"],
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

@@ -50,24 +50,26 @@ function App() {
       {deviceType === 'mobile' ? <PlayCanvasMuseumMobile /> : <PlayCanvasMuseum />}
       
       {/* Version switcher button */}
-      {/* <button
-        onClick={() => switchVersion(deviceType === 'mobile' ? 'desktop' : 'mobile')}
-        style={{
-          position: 'fixed',
-          top: '10px',
-          right: '10px',
-          background: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          border: '1px solid rgba(255, 255, 255, 0.3)',
-          padding: '10px 15px',
-          borderRadius: '8px',
-          cursor: 'pointer',
-          fontSize: '12px',
-          zIndex: 9999
-        }}
-      >
-        Switch to {deviceType === 'mobile' ? 'Desktop' : 'Mobile'} Version
-      </button> */}
+      {import.meta.env.MODE === 'development' && (
+        <button
+          onClick={() => switchVersion(deviceType === 'mobile' ? 'desktop' : 'mobile')}
+          style={{
+            position: 'fixed',
+            top: '10px',
+            right: '10px',
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            border: '1px solid rgba(255, 255, 255, 0.3)',
+            padding: '10px 15px',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontSize: '12px',
+            zIndex: 9999
+          }}
+        >
+          Switch to {deviceType === 'mobile' ? 'Desktop' : 'Mobile'} Version
+        </button>
+      )}
     </>
   );
 }
