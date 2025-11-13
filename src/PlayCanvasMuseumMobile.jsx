@@ -198,6 +198,25 @@ function PlayCanvasMuseumMobile() {
     camera.setEulerAngles(0, 90, 0);
     app.root.addChild(camera);
 
+    // Dynamic FOV adjustment based on orientation
+    const updateFovForOrientation = () => {
+      if (window.innerWidth > window.innerHeight) {
+        // Landscape
+        camera.camera.fov = 50;
+      } else {
+        // Portrait
+        camera.camera.fov = 70;
+      }
+      camera.camera.aspectRatio = window.innerWidth / window.innerHeight;
+    };
+
+    // Set initial FOV correctly
+    updateFovForOrientation();
+
+    // Listen for resize/orientation changes
+    window.addEventListener('resize', updateFovForOrientation);
+    window.addEventListener('orientationchange', updateFovForOrientation);
+
     app.scene.layers.getLayerByName("World").enabled = true;
 
     app.start();
@@ -857,15 +876,23 @@ function PlayCanvasMuseumMobile() {
       )}
         {isLoaded && !wallInteractionMode && (
         <div style={{
-            position: 'fixed', 
-            bottom: isLandscape ? '10px' : '40px', 
-            left: '50%',
-            transform: 'translateX(-50%)',
+            position: 'fixed',
+            ...(isLandscape ? {
+              top: '10px',
+              right: '40px',
+              left: 'auto',
+              transform: 'none',
+              gap: '0px',
+            } : {
+              bottom: '40px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              gap: '12px',
+            }),
             display: 'flex',
             alignItems: 'center',
-            gap: '12px',
             background: 'rgba(0, 0, 0, 0.8)', 
-            padding: '12px 18px',
+            padding: '12px',
             borderRadius: '12px',
             zIndex: 1000, 
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.5)' 
@@ -879,10 +906,10 @@ function PlayCanvasMuseumMobile() {
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '18px',
+                fontSize: isLandscape ? '14px' : '18px',
                 fontWeight: 'bold',
-                minWidth: '44px', 
-                minHeight: '44px'
+                minWidth: isLandscape ? '32px' : '44px', 
+                minHeight: isLandscape ? '32px' : '44px',
             }}
             >
             ←
@@ -907,10 +934,10 @@ function PlayCanvasMuseumMobile() {
                 border: 'none',
                 borderRadius: '6px',
                 cursor: 'pointer',
-                fontSize: '18px',
+                fontSize: isLandscape ? '14px' : '18px',
                 fontWeight: 'bold',
-                minWidth: '44px', // iOS recommended tap target size
-                minHeight: '44px'
+                minWidth: isLandscape ? '32px' : '44px', 
+                minHeight: isLandscape ? '32px' : '44px',
             }}
             >
             →
@@ -1255,17 +1282,17 @@ function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: 'white',
-          borderRadius: '15px',
-          padding: isLandscape ? '10px' : '20px',
+          background: 'white', 
+          borderRadius: '15px', 
+          padding: isLandscape ? '10px' : '20px', 
           width: isLandscape ? '95vw' : '90%',
-          maxWidth: '450px',
-          height: isLandscape ? '90dvh' : '80vh',
-          overflow: 'hidden',
-          display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
-          top: isLandscape ? '-50px' : 'inherit',
+          maxWidth: '500px', 
+          height: isLandscape ? '90dvh' : '80vh', 
+          overflow: 'visible', 
+          display: 'flex', 
+          flexDirection: 'column', 
+          position: 'relative', 
+          top: '-50px'
         }}
       >
         {/* Close button */}
