@@ -1322,7 +1322,7 @@ function PlayCanvasMuseum() {
           alignItems: 'center',
           gap: '15px',
           background: 'rgba(0, 0, 0, 0.7)',
-          padding: '15px 20px',
+          padding: '15px',
           borderRadius: '12px',
           zIndex: 100
         }}>
