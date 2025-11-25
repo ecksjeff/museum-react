@@ -907,7 +907,7 @@ export const personalPhotos = [
   {
     meshId: '198',
     src: `${CLOUDFLARE_BASE_URL}/images/personal/AN_198.jpg`,
-    caption: 'Janet Leigh, Eugene Klein, Pierre Salinger, and Roz and Gene Wyman are pictured on the Mediterranean sea. A lively vacation with friends outside of the grind of the city.'
+    caption: 'Janet Leigh, Eugene Klein, Barry Sterling, and Roz and Gene Wyman are pictured on the Mediterranean sea. A lively vacation with friends outside of the grind of the city.'
   },
   {
     meshId: '199',
@@ -944,6 +944,5 @@ export const personalPhotos = [
 
 // Video URL - also hosted on Cloudflare
 export const documentaryVideo = {
-  mp4: `${CLOUDFLARE_BASE_URL}/videos/ROZ_DOC.mp4`,
-  webm: `${CLOUDFLARE_BASE_URL}/videos/ROZ_DOC.webm`
+  mp4: `${CLOUDFLARE_BASE_URL}/videos/FEARLESS.mp4`
 };

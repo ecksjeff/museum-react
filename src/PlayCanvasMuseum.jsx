@@ -21,6 +21,7 @@ function PlayCanvasMuseum() {
   const [wallInteractionMode, setWallInteractionMode] = useState(null);
   const [wallPhotoMode, setWallPhotoMode] = useState(null);
   const [isCameraMoving, setIsCameraMoving] = useState(false);
+  const [showBobbleheadVideo, setShowBobbleheadVideo] = useState(false);
   const [viewpoints] = useState([
     { name: "Politics", position: [-2, 2, 5.75], rotation: [0, 90, 0] },
     { name: "Family Table", position: [0, 2, 3], rotation: [-25, 0, 0] },
@@ -284,7 +285,7 @@ function PlayCanvasMuseum() {
           const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
           devLog('Loading interactive mesh...');
-          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
+          const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v6.glb";
           const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
           let collisionLoaded = false;
@@ -442,6 +443,52 @@ function PlayCanvasMuseum() {
                 const farPoint = cameraComponent.screenToWorld(x, y, cameraComponent.farClip);
                 const rayDirection = new pc.Vec3().sub2(farPoint, cameraPos).normalize();
                 
+                if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
+                  let clickedBobblehead = false;
+                  
+                  interactiveEntity.model.meshInstances.forEach((mi) => {
+                    const materialName = mi.material.name;
+                    
+                    if (materialName.toLowerCase().includes('bobblehead')) {
+                      const aabb = mi.aabb;
+                      const min = aabb.getMin();
+                      const max = aabb.getMax();
+                      
+                      // Same AABB intersection test as before
+                      let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                      let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+                      
+                      let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                      let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                      if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+                      
+                      if (tmin > tymax || tymin > tmax) return;
+                      
+                      tmin = Math.max(tmin, tymin);
+                      tmax = Math.min(tmax, tymax);
+                      
+                      let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                      let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                      if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+                      
+                      if (tmin > tzmax || tzmin > tmax) return;
+                      
+                      tmin = Math.max(tmin, tzmin);
+                      
+                      if (tmin > 0) {
+                        clickedBobblehead = true;
+                      }
+                    }
+                  });
+                  
+                  if (clickedBobblehead) {
+                    devLog('Clicked bobblehead in Personal wall mode!');
+                    setShowBobbleheadVideo(true);
+                    return;
+                  }
+                }
+
                 // Check for photo mesh clicks
                 if (interactiveEntity.model && interactiveEntity.model.meshInstances) {
                   let closestPhotoDistance = Infinity;
@@ -564,6 +611,7 @@ function PlayCanvasMuseum() {
                   } else {
                     devLog(`No photo clicked`);
                   }
+                  
                 }
                 return;
               }
@@ -618,15 +666,15 @@ function PlayCanvasMuseum() {
                     
                     if (tmin > 0 && tmin < closestDistance) {
                       closestDistance = tmin;
-                      clickedTable = { name: materialName, index: index };
+                      clickedTable = { name: materialName, index: index, type: 'table' };
                     }
                   }
                 });
                 
                 if (clickedTable) {
-                  devLog(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
-                  enterWallMode('Family Photos', new pc.Vec3(0, 1.5, 1));  // Enter wall mode instead
-                  return;
+                    devLog(`Clicked ON table: ${clickedTable.name} (mesh instance ${clickedTable.index})`);
+                    enterWallMode('Family Photos', new pc.Vec3(0, 1.5, 1));  // Enter wall mode instead
+                    return;
                 }
               }
               
@@ -1292,6 +1340,8 @@ function PlayCanvasMuseum() {
           <div>Click & drag to look around</div>
           <div>Click the floor to move</div>
           <div>Click a photo to learn more</div>
+          <div>Click the bobblehead to watch</div>
+          <div>the Roz Wyman Documentary</div>
         </div>
       )}
       {(isInteractiveMode || wallPhotoMode) && (
@@ -1310,6 +1360,12 @@ function PlayCanvasMuseum() {
           }}
           imageUrls={imageUrls}
           title={wallPhotoMode?.wallName || "Roz Wyman Family Collection"}
+        />
+      )}
+      {showBobbleheadVideo && (
+        <BobbleheadVideoPopup
+          videoSrc="https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/videos/FEARLESS.mp4"
+          onClose={() => setShowBobbleheadVideo(false)}
         />
       )}
       {isLoaded && !wallInteractionMode && (
@@ -1970,6 +2026,80 @@ function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls, title }) {
           >
             Next →
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Bobblehead Video Popup component
+function BobbleheadVideoPopup({ videoSrc, onClose }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.8)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    }}
+    onClick={onClose}
+    >
+      <div 
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        background: 'white',
+        borderRadius: '15px',
+        padding: '20px',
+        maxWidth: '80vw',
+        width: '90%',
+        maxHeight: '90vh',
+        overflow: 'visible',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative'
+      }}>
+        <button 
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px',
+            right: '20px',
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '35px',
+            height: '35px',
+            cursor: 'pointer',
+            fontSize: '18px',
+            zIndex: 1001
+          }}
+        >
+          ×
+        </button>
+        
+        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
+            FEARLESS - The Roz Wyman Story
+          </h3>
+          
+          <video 
+            src={videoSrc}
+            controls
+            autoPlay
+            style={{
+              maxWidth: '100%',
+              maxHeight: '70vh',
+              borderRadius: '10px',
+              boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+              margin: '0 auto'
+            }}
+          />
         </div>
       </div>
     </div>

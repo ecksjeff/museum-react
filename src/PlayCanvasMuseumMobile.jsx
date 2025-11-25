@@ -19,6 +19,7 @@ function PlayCanvasMuseumMobile() {
   const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
   const [currentViewpointIndex, setCurrentViewpointIndex] = useState(0);
   const [imageUrls, setImageUrls] = useState({});
+  const [showBobbleheadVideo, setShowBobbleheadVideo] = useState(false);
   const [isLandscape, setIsLandscape] = useState(window.innerWidth > window.innerHeight);
   useEffect(() => {
     const handleResize = () => {
@@ -278,7 +279,7 @@ function PlayCanvasMuseumMobile() {
 					const collisionAsset = new pc.Asset('collision-mesh', 'model', { url: collisionUrl });
 
 					devLog('Loading interactive mesh...');
-					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v5.glb";
+					const interactiveUrl = "https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/meshes/roz-room_v6.glb";
 					const interactiveAsset = new pc.Asset('interactive-mesh', 'container', { url: interactiveUrl });
 
 					let collisionLoaded = false;
@@ -567,6 +568,41 @@ function PlayCanvasMuseumMobile() {
                         }
                         break;
                       }
+                    } else if (window.currentWallMode?.wallName === 'Politics Photos' && matName.includes('bobblehead')) {
+                      // Check for bobblehead hit with raycasting
+                      devLog('Checking bobblehead material:', matName);
+                      const aabb = mi.aabb;
+                      const min = aabb.getMin();
+                      const max = aabb.getMax();
+
+                      let tmin = (min.x - cameraPos.x) / rayDirection.x;
+                      let tmax = (max.x - cameraPos.x) / rayDirection.x;
+                      if (tmin > tmax) [tmin, tmax] = [tmax, tmin];
+
+                      let tymin = (min.y - cameraPos.y) / rayDirection.y;
+                      let tymax = (max.y - cameraPos.y) / rayDirection.y;
+                      if (tymin > tymax) [tymin, tymax] = [tymax, tymin];
+
+                      if (tmin > tymax || tymin > tmax) continue;
+
+                      tmin = Math.max(tmin, tymin);
+                      tmax = Math.min(tmax, tymax);
+
+                      let tzmin = (min.z - cameraPos.z) / rayDirection.z;
+                      let tzmax = (max.z - cameraPos.z) / rayDirection.z;
+                      if (tzmin > tzmax) [tzmin, tzmax] = [tzmax, tzmin];
+
+                      if (tmin > tzmax || tzmin > tmax) continue;
+
+                      tmin = Math.max(tmin, tzmin);
+                      
+                      if (tmin > 0) {
+                        devLog('Clicked bobblehead in Politics wall mode!');
+                        setShowBobbleheadVideo(true);
+                        isTouching = false;
+                        isDragging = false;
+                        return;
+                      }
                     }
                   }
                   
@@ -851,6 +887,8 @@ function PlayCanvasMuseumMobile() {
           <div>Swipe up and down to move</div>
           <div>Swipe left and right to Turn</div>
           <div>Tap on a photo to learn more</div>
+          <div>Tap the bobblehead to watch</div>
+          <div>the Roz Wyman Documentary</div>
         </div>
       )}
       {isLoaded && !wallInteractionMode && isLandscape && (
@@ -863,6 +901,8 @@ function PlayCanvasMuseumMobile() {
           <div>Swipe up and down to move</div>
           <div>Swipe left and right to Turn</div>
           <div>Tap on a photo to learn more</div>
+          <div>Tap the bobblehead to watch</div>
+          <div>the Roz Wyman Documentary</div>
         </div>
       )}
         {isLoaded && !wallInteractionMode && (
@@ -1018,6 +1058,13 @@ function PlayCanvasMuseumMobile() {
           imageUrls={imageUrls}
         />
         </>
+      )}
+      {showBobbleheadVideo && (
+        <BobbleheadVideoPopup
+          videoSrc="https://pub-b1b1a0b8a789411aa54abb9c340ba12e.r2.dev/videos/FEARLESS.mp4"
+          onClose={() => setShowBobbleheadVideo(false)}
+          isLandscape={isLandscape}
+        />
       )}
     </div>
   );
@@ -1448,6 +1495,81 @@ function PhotoSlideshow({ photos, startIndex = 0, onClose, imageUrls }) {
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+// Bobblehead Video Popup component
+function BobbleheadVideoPopup({ videoSrc, onClose, isLandscape }) {
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: '100vw',
+      height: '100vh',
+      background: 'rgba(0, 0, 0, 0.8)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    }}
+    onClick={onClose}
+    >
+      <div 
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        background: 'white',
+        borderRadius: '15px',
+        padding: '20px',
+        maxWidth: isLandscape ? '60vw' : '90vw',
+        width: '90%',
+        maxHeight: '90vh',
+        overflow: 'visible',
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        top: '-40px'
+      }}>
+        <button 
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: '15px', 
+            right: '20px',
+            background: '#f44336',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: '35px',
+            height: '35px',
+            cursor: 'pointer',
+            fontSize: '18px',
+            zIndex: 1001
+          }}
+        >
+          ×
+        </button>
+        
+        <div style={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <h3 style={{ marginTop: 0, marginBottom: '15px', color: '#333' }}>
+            FEARLESS - The Roz Wyman Story
+          </h3>
+          
+          <video 
+            src={videoSrc}
+            controls
+            autoPlay
+            playsInline
+            style={{
+              maxWidth: '100%',
+              maxHeight: isLandscape ? '50vh' : '70vh',
+              borderRadius: '10px',
+              boxShadow: '0 4px 15px rgba(0, 0, 0, 0.2)',
+              margin: '0 auto'
+            }}
+          />
+        </div>
       </div>
     </div>
   );
